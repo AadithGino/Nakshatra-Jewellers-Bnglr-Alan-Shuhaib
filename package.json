@@ -8,6 +8,7 @@
     "dev:api": "npm run dev -w @nakshathra/api",
     "dev:web": "npm run dev -w @nakshathra/web",
     "build": "npm run build -w @nakshathra/api && npm run build -w @nakshathra/web",
+    "build:web": "npm run build -w @nakshathra/web",
     "typecheck": "npm run typecheck -w @nakshathra/api && npm run typecheck -w @nakshathra/web",
     "lint": "npm run lint -w @nakshathra/web",
     "test": "npm run test -w @nakshathra/api && npm run typecheck && npm run build",

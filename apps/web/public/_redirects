@@ -1,0 +1,10 @@
+# Used when you upload apps/web/dist to Netlify (folder deploy / drag-drop).
+# Vite copies this file into dist/.
+
+# Proxy API to Lightsail (force)
+/api/*   https://nakshatrabnglr.keralabilling.com/api/:splat  200!
+/health  https://nakshatrabnglr.keralabilling.com/health     200!
+/ready   https://nakshatrabnglr.keralabilling.com/ready      200!
+
+# SPA: refresh on any path → index.html (no Netlify 404)
+/*       /index.html   200
