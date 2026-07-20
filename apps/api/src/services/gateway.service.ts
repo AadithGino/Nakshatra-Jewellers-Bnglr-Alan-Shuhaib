@@ -16,9 +16,8 @@ import { phonePeProvider } from './phonepe.provider.js';
 export async function initiatePhonePe(
   userId: string,
   input: { schemeId: string; amountPaise: number; idempotencyKey: string },
-  _requestId: string,
+  requestId: string,
 ) {
-  void _requestId;
   const settings = await SystemSetting.findOne({ singletonKey: 'GLOBAL' })
     .select('customerPhonePeEnabled')
     .lean();
@@ -101,6 +100,20 @@ export async function initiatePhonePe(
     intent.expiresAt = checkout.expiresAt;
     intent.status = 'PENDING';
     await intent.save();
+
+    // Test mode: credit the scheme immediately so cancel / missing webhook still succeed.
+    // Checkout URL is still returned so PhonePe QR / page can open for the UX test.
+    if (env.PHONEPE_FORCE_SUCCESS) {
+      await finalizeGatewayPayment(
+        intent,
+        {
+          transactionId: `FORCE-SUCCESS-${merchantTransactionId}`,
+          amountPaise: intent.amountPaise,
+        },
+        { requestId },
+      );
+    }
+
     return {
       merchantTransactionId,
       checkoutUrl: checkout.redirectUrl,
@@ -109,6 +122,7 @@ export async function initiatePhonePe(
       goldRatePerGramPaise: rules.goldRatePerGramPaise,
       goldWeightMg: rules.goldWeightMg,
       goldPurity: rules.goldPurity,
+      status: env.PHONEPE_FORCE_SUCCESS ? 'SUCCESS' : 'PENDING',
     };
   } catch (error) {
     intent.status = 'FAILED';
@@ -148,6 +162,25 @@ export async function processPhonePeWebhook(
       'Webhook does not match a payment intent',
       409,
     );
+  // Never downgrade a payment that was already credited (e.g. PHONEPE_FORCE_SUCCESS).
+  if (intent.status === 'SUCCESS') {
+    event.processedAt = new Date();
+    await event.save();
+    return { processed: true, state: intent.status };
+  }
+  if (env.PHONEPE_FORCE_SUCCESS) {
+    await finalizeGatewayPayment(
+      intent,
+      {
+        transactionId: `FORCE-SUCCESS-${intent.merchantTransactionId}`,
+        amountPaise: intent.amountPaise,
+      },
+      { requestId },
+    );
+    event.processedAt = new Date();
+    await event.save();
+    return { processed: true, state: intent.status };
+  }
   const serverStatus = await phonePeProvider.checkStatus(intent.merchantTransactionId);
   if (serverStatus.amountPaise !== intent.amountPaise)
     throw new AppError('GATEWAY_AMOUNT_MISMATCH', 'Verified gateway amount mismatch', 409);
