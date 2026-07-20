@@ -1,0 +1,38 @@
+[build]
+  command = "npm install && npm run build -w @nakshathra/web"
+  publish = "apps/web/dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# SPA fallback — keep AFTER the API proxy rule below
+# Replace API_HOST_REPLACE_ME with your Lightsail subdomain, e.g. schemes-api.yourdomain.com
+# (nginx on Lightsail terminates TLS and proxies that host → 127.0.0.1:2020)
+[[redirects]]
+  from = "/api/*"
+  to = "https://API_HOST_REPLACE_ME/api/:splat"
+  status = 200
+  force = true
+  headers = { X-From = "netlify-proxy" }
+
+[[redirects]]
+  from = "/health"
+  to = "https://API_HOST_REPLACE_ME/health"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/ready"
+  to = "https://API_HOST_REPLACE_ME/ready"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

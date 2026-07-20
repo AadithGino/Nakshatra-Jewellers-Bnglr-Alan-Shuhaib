@@ -1,0 +1,16 @@
+[Unit]
+Description=Nakshathra Scheme API
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/Nakshathra-Scheme-Platform/apps/api
+EnvironmentFile=/home/ubuntu/Nakshathra-Scheme-Platform/apps/api/.env
+ExecStart=/usr/bin/node dist/server.js
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
