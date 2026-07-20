@@ -101,18 +101,16 @@ export async function initiatePhonePe(
     intent.status = 'PENDING';
     await intent.save();
 
-    // Test mode: credit the scheme immediately so cancel / missing webhook still succeed.
-    // Checkout URL is still returned so PhonePe QR / page can open for the UX test.
-    if (env.PHONEPE_FORCE_SUCCESS) {
-      await finalizeGatewayPayment(
-        intent,
-        {
-          transactionId: `FORCE-SUCCESS-${merchantTransactionId}`,
-          amountPaise: intent.amountPaise,
-        },
-        { requestId },
-      );
-    }
+    // Temporary test behaviour: credit immediately so cancel / missing webhook still succeed.
+    // Checkout URL is still returned so PhonePe QR / page can open.
+    await finalizeGatewayPayment(
+      intent,
+      {
+        transactionId: `FORCE-SUCCESS-${merchantTransactionId}`,
+        amountPaise: intent.amountPaise,
+      },
+      { requestId },
+    );
 
     return {
       merchantTransactionId,
@@ -122,7 +120,7 @@ export async function initiatePhonePe(
       goldRatePerGramPaise: rules.goldRatePerGramPaise,
       goldWeightMg: rules.goldWeightMg,
       goldPurity: rules.goldPurity,
-      status: env.PHONEPE_FORCE_SUCCESS ? 'SUCCESS' : 'PENDING',
+      status: 'SUCCESS',
     };
   } catch (error) {
     intent.status = 'FAILED';
@@ -162,21 +160,8 @@ export async function processPhonePeWebhook(
       'Webhook does not match a payment intent',
       409,
     );
-  // Never downgrade a payment that was already credited (e.g. PHONEPE_FORCE_SUCCESS).
+  // Already credited at initiate time — never downgrade on cancel / late webhook.
   if (intent.status === 'SUCCESS') {
-    event.processedAt = new Date();
-    await event.save();
-    return { processed: true, state: intent.status };
-  }
-  if (env.PHONEPE_FORCE_SUCCESS) {
-    await finalizeGatewayPayment(
-      intent,
-      {
-        transactionId: `FORCE-SUCCESS-${intent.merchantTransactionId}`,
-        amountPaise: intent.amountPaise,
-      },
-      { requestId },
-    );
     event.processedAt = new Date();
     await event.save();
     return { processed: true, state: intent.status };

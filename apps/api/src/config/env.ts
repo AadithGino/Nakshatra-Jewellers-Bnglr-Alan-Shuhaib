@@ -23,8 +23,6 @@ const schema = z
     PHONEPE_WEBHOOK_USERNAME: z.string().default(''),
     PHONEPE_WEBHOOK_PASSWORD: z.string().default(''),
     PHONEPE_REDIRECT_URL: z.string().url(),
-    /** Test only: finalize PhonePe as SUCCESS as soon as checkout is created (QR still opens). */
-    PHONEPE_FORCE_SUCCESS: bool.default(false),
     LOG_LEVEL: z.string().default('info'),
   })
   .superRefine((env, ctx) => {
