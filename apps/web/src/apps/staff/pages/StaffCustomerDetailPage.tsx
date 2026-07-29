@@ -18,6 +18,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, ApiError } from '../../../shared/services/api.client';
 import { useAuth } from '../../../shared/hooks/useAuth';
 import { date, money } from '../../../shared/utils/format';
+import { AadhaarDocumentSection } from '../../../shared/components/AadhaarDocumentSection';
 import { Card, Modal, Notice, Page, QueryState, Status } from '../../../shared/components/ui';
 
 export function StaffCustomerDetailPage() {
@@ -121,6 +122,11 @@ export function StaffCustomerDetailPage() {
                 )}
               </div>
             </section>
+
+            <AadhaarDocumentSection
+              aadhaar={customer.aadhaar}
+              customerName={customer.userId?.name}
+            />
 
             <section className="detail-highlight-grid scheme-facts-grid">
               <article>

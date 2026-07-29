@@ -100,14 +100,14 @@ svg {
   background: linear-gradient(165deg, #651226, #3e0b17);
   color: white;
 }
-.admin-shell nav {
+.admin-shell > aside > nav {
   display: flex;
   flex-direction: column;
   gap: 3px;
   margin-top: 35px;
   overflow: auto;
 }
-.admin-shell nav a,
+.admin-shell > aside > nav a,
 .logout {
   display: flex;
   align-items: center;
@@ -121,8 +121,8 @@ svg {
   font-size: 13px;
   font-weight: 600;
 }
-.admin-shell nav a:hover,
-.admin-shell nav a.active {
+.admin-shell > aside > nav a:hover,
+.admin-shell > aside > nav a.active {
   color: white;
   background: rgba(255, 255, 255, 0.1);
   box-shadow: inset 3px 0 var(--gold-2);
@@ -221,7 +221,7 @@ svg {
 table {
   width: 100%;
   border-collapse: collapse;
-  white-space: nowrap;
+  white-space: normal;
 }
 th,
 td {
@@ -325,6 +325,29 @@ tbody tr:hover {
   grid-template-columns: minmax(380px, 1.15fr) minmax(380px, 0.85fr);
   min-height: 100vh;
 }
+
+.auth-boot {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 16px;
+  min-height: 100vh;
+  padding: 32px;
+  color: #fff;
+  background:
+    radial-gradient(circle at 85% 20%, rgba(210, 164, 66, 0.22), transparent 24%),
+    linear-gradient(145deg, #72152c, #3b0916);
+  text-align: center;
+}
+
+.auth-boot p {
+  margin: 0;
+  color: #e8d8dc;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
 .login-story {
   display: flex;
   justify-content: space-between;
@@ -926,6 +949,14 @@ label > span {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+@media (max-width: 900px) {
+  .login-page {
+    grid-template-columns: 1fr;
+  }
+  .login-story {
+    display: none;
+  }
+}
 @media (max-width: 760px) {
   .admin-shell {
     grid-template-columns: 72px 1fr;
@@ -934,13 +965,13 @@ label > span {
     padding: 20px 10px;
   }
   .admin-shell .brand-mark div,
-  .admin-shell nav a {
+  .admin-shell > aside > nav a {
     font-size: 0;
   }
-  .admin-shell nav a {
+  .admin-shell > aside > nav a {
     justify-content: center;
   }
-  .admin-shell nav a svg {
+  .admin-shell > aside > nav a svg {
     width: 21px;
     height: 21px;
   }
@@ -990,7 +1021,7 @@ label > span {
     position: static;
     height: auto;
   }
-  .admin-shell nav {
+  .admin-shell > aside > nav {
     display: none;
   }
   .admin-shell .logout {

@@ -16,6 +16,13 @@ export type ReceiptPayment = {
   goldPurity?: string | null;
 };
 
+function safeDate(value?: string | Date | null) {
+  if (value == null || value === '') return null;
+  const parsed = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return date(parsed);
+}
+
 export function ReceiptSheet({
   payment,
   title = 'Payment receipt',
@@ -34,6 +41,10 @@ export function ReceiptSheet({
   showPrint?: boolean;
 }) {
   const weightLabel = goldGrams(payment.goldWeightMg);
+  const amountPaise = Number(payment.amountPaise ?? 0);
+  const paymentDateLabel = safeDate(payment.paymentDate);
+  const statusValue =
+    typeof payment.status === 'string' && payment.status.trim() ? payment.status : null;
 
   return (
     <div className="receipt-sheet">
@@ -48,15 +59,15 @@ export function ReceiptSheet({
         <CheckCircle2 />
         <span>
           <small>{amountLabel}</small>
-          <strong>{money(payment.amountPaise ?? 0)}</strong>
+          <strong>{money(Number.isFinite(amountPaise) ? amountPaise : 0)}</strong>
         </span>
       </div>
 
       <div className="receipt-lines">
-        {payment.paymentDate != null && (
+        {paymentDateLabel && (
           <div>
             <span>Date</span>
-            <b>{date(payment.paymentDate)}</b>
+            <b>{paymentDateLabel}</b>
           </div>
         )}
         {payment.method && (
@@ -65,10 +76,10 @@ export function ReceiptSheet({
             <b>{payment.method}</b>
           </div>
         )}
-        {payment.status && (
+        {statusValue && (
           <div>
             <span>Status</span>
-            <Status value={payment.status} />
+            <Status value={statusValue} />
           </div>
         )}
         <div>
