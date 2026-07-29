@@ -12,6 +12,7 @@ import {
   createCashSubmissionHandler,
   createManualPaymentHandler,
   createPayoutHandler,
+  getPaymentHandler,
   listAuditLogsHandler,
   listCashSubmissionsHandler,
   listCorrectionsHandler,
@@ -29,6 +30,7 @@ financeAdminRouter.post(
   asyncHandler(createManualPaymentHandler),
 );
 financeAdminRouter.get('/payments', asyncHandler(listPaymentsHandler));
+financeAdminRouter.get('/payments/:id', asyncHandler(getPaymentHandler));
 financeAdminRouter.post(
   '/payments/:id/reverse',
   validateBody(reversePaymentSchema),

@@ -61,6 +61,13 @@ export async function issueSession(user: any, context: { ip?: string; userAgent?
     },
   };
 }
+
+async function issueAccessToken(user: any) {
+  const base = await claimsFor(user);
+  return jwt.sign({ ...base, type: 'access' }, env.JWT_ACCESS_SECRET, {
+    expiresIn: `${env.ACCESS_TOKEN_TTL_MINUTES}m`,
+  });
+}
 export async function login(
   phone: string,
   password: string,
@@ -115,9 +122,33 @@ export async function refresh(
     user.sessionVersion !== claims.sessionVersion
   )
     throw new AppError('SESSION_EXPIRED', 'Session expired', 401);
-  session.revokedAt = new Date();
+
+  // Renew access only — keep the same refresh token so concurrent tabs/requests
+  // cannot invalidate each other by rotating the refresh session.
+  session.ip = context.ip;
+  session.userAgent = context.userAgent;
+  session.expiresAt = new Date(Date.now() + env.REFRESH_TOKEN_TTL_DAYS * 86400000);
   await session.save();
-  return issueSession(user, context);
+
+  const access = await issueAccessToken(user);
+  const permissions =
+    user.role === 'STAFF'
+      ? ((await StaffProfile.findOne({ userId: user._id }).lean())?.permissions ?? [])
+      : [];
+
+  return {
+    tokens: { access, refresh: token },
+    data: {
+      user: {
+        id: String(user._id),
+        name: user.name,
+        phone: user.phone,
+        role: user.role,
+        permissions,
+      },
+      redirectTo: `/${String(user.role).toLowerCase()}`,
+    },
+  };
 }
 export async function logout(token: string | undefined) {
   if (token) await RefreshSession.updateOne({ tokenHash: hash(token) }, { revokedAt: new Date() });

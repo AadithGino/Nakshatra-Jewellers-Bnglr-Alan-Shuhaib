@@ -5,7 +5,7 @@ import { CashSubmission, Payment, PaymentCorrection, StaffProfile, User } from '
 import { hashPassword } from './auth.service.js';
 import { audit, type AuditContext } from './audit.service.js';
 import type { CreateStaffInput, UpdateStaffInput } from '../validators/staff.validators.js';
-import { staffDashboard } from './report.service.js';
+import { paymentDateMatch, staffMemberReport, submissionDateMatch } from './report.service.js';
 
 export async function createStaff(
   input: CreateStaffInput,
@@ -130,16 +130,27 @@ async function resolveStaffProfile(id: string, session?: ClientSession) {
   return profile;
 }
 
-export async function getStaffDetails(id: string) {
+export async function getStaffDetails(id: string, from?: Date, to?: Date) {
   const profile = await resolveStaffProfile(id);
+  const staffUserId = String(profile.userId);
   const [populatedProfile, report, payments, submissions, corrections] = await Promise.all([
     StaffProfile.findById(profile._id).populate('userId', 'name phone status lastLoginAt').lean(),
-    staffDashboard(String(profile.userId)),
-    listStaffPayments(String(profile.userId)),
-    listStaffCashSubmissions(String(profile.userId)),
-    listStaffCorrections(String(profile.userId)),
+    staffMemberReport(staffUserId, from, to),
+    listStaffPayments(staffUserId, from, to),
+    listStaffCashSubmissions(staffUserId, from, to),
+    listStaffCorrections(staffUserId),
   ]);
-  return { profile: populatedProfile, report, payments, submissions, corrections };
+  return {
+    profile: populatedProfile,
+    report,
+    payments,
+    submissions,
+    corrections,
+    range: {
+      from: from?.toISOString() ?? null,
+      to: to?.toISOString() ?? null,
+    },
+  };
 }
 
 export async function updateStaff(
@@ -172,14 +183,28 @@ export async function updateStaff(
   return getStaffDetails(profileId);
 }
 
-export const listStaffPayments = (staffId: string) =>
-  Payment.find({ collectedBy: staffId }).sort({ paymentDate: -1 }).limit(100).lean();
+export const listStaffPayments = (staffId: string, from?: Date, to?: Date) =>
+  Payment.find({
+    collectedBy: staffId,
+    collectorRole: 'STAFF',
+    ...paymentDateMatch(from, to),
+  })
+    .populate({ path: 'customerId', populate: { path: 'userId', select: 'name phone' } })
+    .populate('schemeId', 'enrollmentNumber schemeType')
+    .sort({ paymentDate: -1 })
+    .limit(200)
+    .lean();
 
 export const listStaffCorrections = (staffId: string) =>
   PaymentCorrection.find({ requestedBy: staffId }).sort({ createdAt: -1 }).lean();
 
-export const listStaffCashSubmissions = (staffId: string) =>
-  CashSubmission.find({ staffId }).sort({ submissionDate: -1 }).lean();
+export const listStaffCashSubmissions = (staffId: string, from?: Date, to?: Date) =>
+  CashSubmission.find({
+    staffId,
+    ...submissionDateMatch(from, to),
+  })
+    .sort({ submissionDate: -1 })
+    .lean();
 
 export const getStaffProfile = (staffId: string) =>
   StaffProfile.findOne({ userId: staffId }).populate('userId', 'name phone lastLoginAt').lean();

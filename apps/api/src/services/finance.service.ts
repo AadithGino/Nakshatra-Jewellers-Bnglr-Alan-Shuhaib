@@ -7,6 +7,7 @@ import {
   PaymentCorrection,
   Payout,
   SchemeEnrollment,
+  StaffProfile,
 } from '../models/index.js';
 import { audit, outbox, type AuditContext } from './audit.service.js';
 import mongoose from 'mongoose';
@@ -17,6 +18,13 @@ import { GoldRate } from '../models/index.js';
 export async function listPayments(page: number, limit: number) {
   const [items, total] = await Promise.all([
     Payment.find()
+      .populate({ path: 'customerId', populate: { path: 'userId', select: 'name phone' } })
+      .populate({
+        path: 'schemeId',
+        select: 'enrollmentNumber schemeType',
+        populate: { path: 'schemePlanId', select: 'name' },
+      })
+      .populate('collectedBy', 'name phone')
       .sort({ paymentDate: -1 })
       .skip((page - 1) * limit)
       .limit(limit)
@@ -27,9 +35,72 @@ export async function listPayments(page: number, limit: number) {
   return { items, total };
 }
 
-export const listCashSubmissions = () => CashSubmission.find().sort({ submissionDate: -1 }).lean();
+export async function getPaymentDetail(paymentId: string) {
+  const payment = await Payment.findById(paymentId)
+    .populate({ path: 'customerId', populate: { path: 'userId', select: 'name phone' } })
+    .populate({
+      path: 'schemeId',
+      select: 'enrollmentNumber schemeType status',
+      populate: { path: 'schemePlanId', select: 'name type' },
+    })
+    .populate('collectedBy', 'name phone')
+    .populate('reversedBy', 'name')
+    .lean();
+  if (!payment) throw new AppError('PAYMENT_NOT_FOUND', 'Payment not found', 404);
+  return payment;
+}
 
-export const listPayouts = () => Payout.find().sort({ payoutDate: -1 }).lean();
+function staffUserKey(value: unknown): string | null {
+  if (!value) return null;
+  if (value instanceof mongoose.Types.ObjectId) return value.toHexString();
+  if (typeof value === 'object' && value !== null && '_id' in value) {
+    return staffUserKey((value as { _id: unknown })._id);
+  }
+  const raw = String(value);
+  return mongoose.isValidObjectId(raw) ? raw : null;
+}
+
+async function withStaffProfiles<T extends { staffId?: any }>(rows: T[]) {
+  const profiles = await StaffProfile.find().select('_id userId employeeCode').lean();
+  const byUser = Object.fromEntries(
+    profiles.map((profile: { _id: unknown; userId: unknown; employeeCode?: string }) => [
+      String(profile.userId),
+      profile,
+    ]),
+  );
+
+  return rows.map((row) => {
+    const userId = staffUserKey(row.staffId);
+    const profile = userId ? byUser[userId] : undefined;
+    return {
+      ...row,
+      staffProfileId: profile?._id ?? null,
+      employeeCode: profile?.employeeCode ?? null,
+    };
+  });
+}
+
+export async function listCashSubmissions() {
+  const rows = await CashSubmission.find()
+    .populate('staffId', 'name phone')
+    .populate('receivedBy', 'name phone')
+    .populate('createdBy', 'name phone')
+    .sort({ submissionDate: -1 })
+    .lean();
+  return withStaffProfiles(rows);
+}
+
+export const listPayouts = () =>
+  Payout.find()
+    .populate({ path: 'customerId', populate: { path: 'userId', select: 'name phone' } })
+    .populate({
+      path: 'schemeId',
+      select: 'enrollmentNumber schemeType status',
+      populate: { path: 'schemePlanId', select: 'name type' },
+    })
+    .populate('createdBy', 'name phone')
+    .sort({ payoutDate: -1 })
+    .lean();
 
 export const listCorrections = () => PaymentCorrection.find().sort({ createdAt: -1 }).lean();
 
@@ -180,11 +251,15 @@ export async function createPayout(
     };
     const [payout] = await Payout.create([settlement], { session });
     const status = input.payoutType === 'REDEEM' ? 'REDEEMED' : 'WITHDRAWN';
+    // Full settlement clears outstanding gold balance; payout/payment ledgers keep history.
     await SchemeEnrollment.updateOne(
       { _id: scheme._id },
       {
         $inc: { totalPayoutPaise: availablePaise },
-        $set: { status },
+        $set: {
+          status,
+          totalGoldWeightMg: 0,
+        },
         $push: {
           statusHistory: {
             status,

@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import { Customer, Payment, SchemeEnrollment, User } from '../models/index.js';
 import { AppError } from '../utils/AppError.js';
 import { getPaymentRules } from './scheme.service.js';
+import { signAadhaarUrls } from './storage.service.js';
 
 export async function searchCustomers(search: string) {
   const users = search
@@ -34,6 +35,7 @@ export async function getCustomerFinancialView(customerId: string) {
     Payment.find({ customerId }).sort({ paymentDate: -1 }).limit(30).lean(),
   ]);
   if (!customer) throw new AppError('CUSTOMER_NOT_FOUND', 'Customer not found', 404);
+  const aadhaar = await signAadhaarUrls((customer as any).aadhaar);
   const rules = await Promise.all(
     schemes
       .filter((scheme: any) => scheme.status === 'ACTIVE')
@@ -52,5 +54,10 @@ export async function getCustomerFinancialView(customerId: string) {
         }
       }),
   );
-  return { customer, schemes, payments, paymentRules: rules.filter(Boolean) };
+  return {
+    customer: { ...customer, aadhaar },
+    schemes,
+    payments,
+    paymentRules: rules.filter(Boolean),
+  };
 }

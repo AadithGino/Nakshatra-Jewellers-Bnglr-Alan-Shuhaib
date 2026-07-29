@@ -6,6 +6,7 @@ import { paginationFromQuery } from '../../utils/pagination.js';
 import { listAuditLogs } from '../../services/audit.service.js';
 import {
   createPayout,
+  getPaymentDetail,
   listCashSubmissions,
   listCorrections,
   listPayments,
@@ -32,9 +33,14 @@ export async function createManualPaymentHandler(
 }
 
 export async function listPaymentsHandler(request: AuthenticatedRequest, response: Response) {
-  const { page, limit } = paginationFromQuery(request.query);
+  const page = Math.max(1, Number(request.query.page) || 1);
+  const limit = Math.min(500, Math.max(1, Number(request.query.limit) || 100));
   const { items, total } = await listPayments(page, limit);
   ok(response, items, { page, limit, total });
+}
+
+export async function getPaymentHandler(request: AuthenticatedRequest, response: Response) {
+  ok(response, await getPaymentDetail(String(request.params.id)));
 }
 
 export async function reversePaymentHandler(request: AuthenticatedRequest, response: Response) {

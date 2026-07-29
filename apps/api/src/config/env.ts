@@ -10,7 +10,7 @@ const schema = z
     WEB_ORIGINS: z.string().min(1),
     JWT_ACCESS_SECRET: z.string().min(32),
     JWT_REFRESH_SECRET: z.string().min(32),
-    ACCESS_TOKEN_TTL_MINUTES: z.coerce.number().int().positive().default(15),
+    ACCESS_TOKEN_TTL_MINUTES: z.coerce.number().int().positive().default(480),
     REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(7),
     COOKIE_SECURE: bool.default(false),
     BUSINESS_TIMEZONE: z.literal('Asia/Kolkata').default('Asia/Kolkata'),
@@ -24,6 +24,15 @@ const schema = z
     PHONEPE_WEBHOOK_PASSWORD: z.string().default(''),
     PHONEPE_REDIRECT_URL: z.string().url(),
     LOG_LEVEL: z.string().default('info'),
+    AWS_REGION: z.string().default('ap-south-1'),
+    AWS_S3_BUCKET: z.string().default(''),
+    AWS_S3_PREFIX: z.string().default('jewellers'),
+    AWS_ACCESS_KEY_ID: z.string().default(''),
+    AWS_SECRET_ACCESS_KEY: z.string().default(''),
+    AWS_S3_SIGNED_URL_TTL: z.coerce.number().int().positive().default(3600),
+    MAX_UPLOAD_BYTES: z.coerce.number().int().positive().default(10_485_760),
+    JEWELLERY_ID: z.string().default('nakshathra'),
+    JEWELLERY_SLUG: z.string().default('jewellery'),
   })
   .superRefine((env, ctx) => {
     if (env.PHONEPE_ENABLED) {
@@ -48,4 +57,14 @@ if (!parsed.success) throw new Error(`Invalid environment: ${z.prettifyError(par
 export const env = Object.freeze({
   ...parsed.data,
   origins: parsed.data.WEB_ORIGINS.split(',').map((x) => x.trim()),
+  storage: {
+    region: parsed.data.AWS_REGION,
+    bucket: parsed.data.AWS_S3_BUCKET,
+    prefix: parsed.data.AWS_S3_PREFIX,
+    accessKeyId: parsed.data.AWS_ACCESS_KEY_ID,
+    secretAccessKey: parsed.data.AWS_SECRET_ACCESS_KEY,
+    signedUrlTtl: parsed.data.AWS_S3_SIGNED_URL_TTL,
+    maxBytes: parsed.data.MAX_UPLOAD_BYTES,
+    jewelleryFolder: `${parsed.data.JEWELLERY_ID}-${parsed.data.JEWELLERY_SLUG}`,
+  },
 });

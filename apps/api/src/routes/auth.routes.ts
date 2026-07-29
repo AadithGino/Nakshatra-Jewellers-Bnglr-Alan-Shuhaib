@@ -13,7 +13,7 @@ import {
 
 const authRouter = Router();
 authRouter.post('/login', authRateLimit, validateBody(loginSchema), asyncHandler(loginHandler));
-authRouter.post('/refresh', authRateLimit, asyncHandler(refreshHandler));
+authRouter.post('/refresh', asyncHandler(refreshHandler));
 authRouter.post('/logout', asyncHandler(logoutHandler));
 authRouter.get('/me', authenticate, asyncHandler(currentSessionHandler));
 

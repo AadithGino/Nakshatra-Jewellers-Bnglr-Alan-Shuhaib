@@ -11,6 +11,10 @@ const customerSchema = createSchema({
     state: String,
     postalCode: String,
   },
+  aadhaar: {
+    frontKey: String,
+    backKey: String,
+  },
   nomineeId: objectIdField('Nominee', false),
   status: { type: String, enum: ['ACTIVE', 'INACTIVE'], default: 'ACTIVE', index: true },
   createdBy: objectIdField('User'),

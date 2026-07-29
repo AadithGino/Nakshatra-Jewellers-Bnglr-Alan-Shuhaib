@@ -10,6 +10,7 @@ export type AuditContext = {
 
 export const listAuditLogs = (page: number, limit: number) =>
   AuditLog.find()
+    .populate('actorId', 'name phone role')
     .sort({ createdAt: -1 })
     .skip((page - 1) * limit)
     .limit(limit)

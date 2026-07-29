@@ -1,11 +1,18 @@
-import { z } from 'zod';
+import { z } from "zod";
+
+const aadhaarKeysSchema = z
+  .object({
+    frontKey: z.string().trim().min(1).max(500).optional(),
+    backKey: z.string().trim().min(1).max(500).optional(),
+  })
+  .optional();
 
 export const createCustomerSchema = z.object({
   name: z.string().trim().min(2).max(120),
   phone: z.string().regex(/^\+?[1-9]\d{7,14}$/),
   password: z.string().min(10).max(128),
-  customerCode: z.string().trim().min(2).max(40),
   address: z.record(z.string(), z.string()).optional(),
+  aadhaar: aadhaarKeysSchema,
   nominee: z
     .object({
       name: z.string().trim().min(2).max(120),
@@ -36,9 +43,9 @@ export const updateCustomerSchema = z
       .string()
       .regex(/^\+?[1-9]\d{7,14}$/)
       .optional(),
-    customerCode: z.string().trim().min(2).max(40).optional(),
     address: addressSchema,
-    status: z.enum(['ACTIVE', 'INACTIVE']).optional(),
+    aadhaar: aadhaarKeysSchema,
+    status: z.enum(["ACTIVE", "INACTIVE"]).optional(),
     nominee: z
       .object({
         name: z.string().trim().min(2).max(120),
@@ -50,7 +57,10 @@ export const updateCustomerSchema = z
       })
       .optional(),
   })
-  .refine((value) => Object.keys(value).length > 0, 'At least one field is required');
+  .refine(
+    (value) => Object.keys(value).length > 0,
+    "At least one field is required",
+  );
 
 export type CreateCustomerInput = z.infer<typeof createCustomerSchema>;
 export type UpdateCustomerInput = z.infer<typeof updateCustomerSchema>;

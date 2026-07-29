@@ -4,6 +4,7 @@ import { ok } from '../../utils/respond.js';
 import {
   adminReport,
   getAdminOperationRecord,
+  getPhonePeTransactionDetail,
   listPhonePeTransactions,
 } from '../../services/report.service.js';
 import { AppError } from '../../utils/AppError.js';
@@ -23,6 +24,13 @@ export async function listPhonePeTransactionsHandler(
   response: Response,
 ) {
   ok(response, await listPhonePeTransactions());
+}
+
+export async function getPhonePeTransactionHandler(
+  request: AuthenticatedRequest,
+  response: Response,
+) {
+  ok(response, await getPhonePeTransactionDetail(String(request.params.id)));
 }
 
 export async function getReportHandler(request: AuthenticatedRequest, response: Response) {
