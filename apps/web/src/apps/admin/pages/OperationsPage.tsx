@@ -4,6 +4,7 @@ import { Activity, Database, Plus, Search, ShieldCheck } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api, ApiError } from '../../../shared/services/api.client';
 import { date, money } from '../../../shared/utils/format';
+import { Select } from '../../../shared/components/Select';
 import { Card, Modal, Notice, Page, QueryState, Status } from '../../../shared/components/ui';
 
 export type Field = {
@@ -60,7 +61,6 @@ export const operationConfigs: Record<string, Config> = {
     fields: [
       { key: 'customerId', label: 'Customer', source: 'customers' },
       { key: 'schemePlanId', label: 'Scheme plan', source: 'plans' },
-      { key: 'enrollmentNumber', label: 'Enrollment number' },
       { key: 'startDate', label: 'Start date', type: 'date' },
     ],
   },
@@ -402,19 +402,16 @@ export function OperationsPage({ module }: { module: string }) {
               >
                 <span>{field.label}</span>
                 {field.options || field.source ? (
-                  <select
-                    className="form-control"
+                  <Select
                     required
+                    placeholder="Select"
                     value={values[field.key] ?? ''}
-                    onChange={(e) => setValues({ ...values, [field.key]: e.target.value })}
-                  >
-                    <option value="">Select</option>
-                    {optionsFor(field)?.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                    options={(optionsFor(field) ?? []).map((option) => ({
+                      value: option.value,
+                      label: option.label,
+                    }))}
+                    onChange={(value) => setValues({ ...values, [field.key]: value })}
+                  />
                 ) : (
                   <input
                     className="form-control"

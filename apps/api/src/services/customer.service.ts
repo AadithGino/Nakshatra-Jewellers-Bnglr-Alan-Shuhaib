@@ -14,6 +14,7 @@ import { AppError } from "../utils/AppError.js";
 import { hashPassword } from "./auth.service.js";
 import { audit, type AuditContext } from "./audit.service.js";
 import { isOurStorageObject, signAadhaarUrls } from "./storage.service.js";
+import { createEnrollmentRecord } from "./scheme-management.service.js";
 import type {
   CreateCustomerInput,
   UpdateCustomerInput,
@@ -108,7 +109,19 @@ export async function createCustomer(
       undefined,
       customer.toObject(),
     );
-    return customer;
+    let enrollment = null;
+    if (input.enrollment) {
+      enrollment = await createEnrollmentRecord(
+        {
+          customerId: String(customer._id),
+          schemePlanId: input.enrollment.schemePlanId,
+          startDate: input.enrollment.startDate,
+        },
+        context,
+        session,
+      );
+    }
+    return { customer, enrollment };
   }, context.requestId);
 }
 

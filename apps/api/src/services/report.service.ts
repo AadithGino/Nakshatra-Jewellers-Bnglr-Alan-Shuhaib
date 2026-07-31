@@ -17,6 +17,27 @@ import { AppError } from '../utils/AppError.js';
 import { businessDayRange } from '../utils/time.js';
 
 const total = (rows: any[]) => rows[0]?.total ?? 0;
+const PAYMENT_METHOD_ORDER = ['CASH', 'UPI', 'BANK', 'CARD'] as const;
+
+const normalizeByMethod = (rows: Array<{ _id: string; total?: number; count?: number }>) => {
+  const map = new Map<string, { total: number; count: number }>();
+  for (const row of rows) {
+    const method = String(row._id) === 'PHONEPE' ? 'UPI' : String(row._id);
+    const current = map.get(method) ?? { total: 0, count: 0 };
+    map.set(method, {
+      total: current.total + (row.total ?? 0),
+      count: current.count + (row.count ?? 0),
+    });
+  }
+  return PAYMENT_METHOD_ORDER.map((method) => {
+    const row = map.get(method);
+    return {
+      method,
+      totalPaise: row?.total ?? 0,
+      count: row?.count ?? 0,
+    };
+  });
+};
 export async function financialDashboard(filter: Record<string, unknown> = {}) {
   const success = { status: 'SUCCESS', ...filter };
   const now = new Date();
@@ -317,6 +338,7 @@ export async function staffMemberReport(staffId: string, from?: Date, to?: Date)
   const cashSubmittedPaise = total(periodSubmitted);
   const otherCollectedPaise = collectionPaise - cashCollectedPaise;
   const lifetimeCashWithStaffPaise = Math.max(0, total(lifetimeCash) - total(lifetimeSubmitted));
+  const byMethod = normalizeByMethod(periodByMethod as any[]);
 
   return {
     collectionPaise,
@@ -324,6 +346,7 @@ export async function staffMemberReport(staffId: string, from?: Date, to?: Date)
     cashCollectedPaise,
     cashSubmittedPaise,
     otherCollectedPaise,
+    byMethod,
     cashWithStaffPaise: cashCollectedPaise - cashSubmittedPaise,
     lifetimeCashWithStaffPaise,
     daily: daily.map((row: any) => ({
@@ -526,6 +549,15 @@ export async function staffPerformanceReport(from?: Date, to?: Date) {
           _id: '$collectedBy',
           totalPaise: { $sum: '$amountPaise' },
           cashPaise: { $sum: { $cond: [{ $eq: ['$method', 'CASH'] }, '$amountPaise', 0] } },
+          phonepePaise: { $sum: { $cond: [{ $eq: ['$method', 'PHONEPE'] }, '$amountPaise', 0] } },
+          upiPaise: { $sum: { $cond: [{ $eq: ['$method', 'UPI'] }, '$amountPaise', 0] } },
+          bankPaise: { $sum: { $cond: [{ $eq: ['$method', 'BANK'] }, '$amountPaise', 0] } },
+          cardPaise: { $sum: { $cond: [{ $eq: ['$method', 'CARD'] }, '$amountPaise', 0] } },
+          cashCount: { $sum: { $cond: [{ $eq: ['$method', 'CASH'] }, 1, 0] } },
+          phonepeCount: { $sum: { $cond: [{ $eq: ['$method', 'PHONEPE'] }, 1, 0] } },
+          upiCount: { $sum: { $cond: [{ $eq: ['$method', 'UPI'] }, 1, 0] } },
+          bankCount: { $sum: { $cond: [{ $eq: ['$method', 'BANK'] }, 1, 0] } },
+          cardCount: { $sum: { $cond: [{ $eq: ['$method', 'CARD'] }, 1, 0] } },
           paymentCount: { $sum: 1 },
         },
       },
@@ -542,6 +574,28 @@ export async function staffPerformanceReport(from?: Date, to?: Date) {
     const submissionRow = submissions.find((row: any) => String(row._id) === userId);
     const cashPaise = totalRow?.cashPaise ?? 0;
     const submittedPaise = submissionRow?.submittedPaise ?? 0;
+    const byMethod = [
+      {
+        method: 'CASH',
+        totalPaise: totalRow?.cashPaise ?? 0,
+        count: totalRow?.cashCount ?? 0,
+      },
+      {
+        method: 'UPI',
+        totalPaise: (totalRow?.upiPaise ?? 0) + (totalRow?.phonepePaise ?? 0),
+        count: (totalRow?.upiCount ?? 0) + (totalRow?.phonepeCount ?? 0),
+      },
+      {
+        method: 'BANK',
+        totalPaise: totalRow?.bankPaise ?? 0,
+        count: totalRow?.bankCount ?? 0,
+      },
+      {
+        method: 'CARD',
+        totalPaise: totalRow?.cardPaise ?? 0,
+        count: totalRow?.cardCount ?? 0,
+      },
+    ];
     return {
       ...profile,
       totalPaise: totalRow?.totalPaise ?? 0,
@@ -549,6 +603,7 @@ export async function staffPerformanceReport(from?: Date, to?: Date) {
       cashCollectedPaise: cashPaise,
       cashSubmittedPaise: submittedPaise,
       cashWithStaffPaise: cashPaise - submittedPaise,
+      byMethod,
     };
   });
 }

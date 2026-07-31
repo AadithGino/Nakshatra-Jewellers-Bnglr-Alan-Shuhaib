@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { AlertCircle, ArrowUpRight, Inbox, LoaderCircle, RefreshCw, X } from 'lucide-react';
+import { AlertCircle, ArrowUpRight, CheckCircle2, Inbox, LoaderCircle, RefreshCw, X } from 'lucide-react';
 import { BrandLogo } from './BrandLogo';
 export function Page({
   title,
@@ -179,7 +179,25 @@ export function Modal({
   );
 }
 
-export function Notice({ children, error = false }: { children?: ReactNode; error?: boolean }) {
+export function Notice({
+  children,
+  error = false,
+  action,
+}: {
+  children?: ReactNode;
+  error?: boolean;
+  action?: ReactNode;
+}) {
   if (!children) return null;
-  return <div className={error ? 'form-error' : 'form-success'}>{children}</div>;
+  return (
+    <div className={`ui-notice ${error ? 'error' : 'success'}`} role={error ? 'alert' : 'status'}>
+      <span className="ui-notice-icon" aria-hidden="true">
+        {error ? <AlertCircle /> : <CheckCircle2 />}
+      </span>
+      <div className="ui-notice-body">
+        <p>{children}</p>
+        {action ? <div className="ui-notice-action">{action}</div> : null}
+      </div>
+    </div>
+  );
 }

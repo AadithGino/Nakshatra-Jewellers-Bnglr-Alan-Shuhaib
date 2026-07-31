@@ -1,5 +1,5 @@
 import { createSchema, objectIdField, registerModel } from './model-helpers.js';
-import { PAYMENT_STATUSES } from './enums.js';
+import { PAYMENT_STATUSES, ROLES } from './enums.js';
 
 const paymentIntentSchema = createSchema({
   customerId: objectIdField('Customer'),
@@ -18,6 +18,8 @@ const paymentIntentSchema = createSchema({
   goldPurity: { type: String, enum: ['916'] },
   quoteCreatedAt: Date,
   quoteExpiresAt: Date,
+  collectedBy: objectIdField('User', false),
+  collectorRole: { type: String, enum: ROLES, default: 'CUSTOMER' },
   createdBy: objectIdField('User'),
 });
 

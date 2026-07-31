@@ -86,9 +86,9 @@ export function AdminCustomerDetailPage() {
   const [error, setError] = useState('');
   const [edit, setEdit] = useState(editEmpty);
   const [password, setPassword] = useState('');
+  const [historyTab, setHistoryTab] = useState<'schemes' | 'payments' | 'payouts'>('schemes');
   const [enrollment, setEnrollment] = useState({
     schemePlanId: '',
-    enrollmentNumber: '',
     startDate: new Date().toISOString().slice(0, 10),
   });
   const [payout, setPayout] = useState({
@@ -248,7 +248,6 @@ export function AdminCustomerDetailPage() {
     setError('');
     setEnrollment({
       schemePlanId: '',
-      enrollmentNumber: '',
       startDate: new Date().toISOString().slice(0, 10),
     });
     setModal('enroll');
@@ -437,6 +436,31 @@ export function AdminCustomerDetailPage() {
               customerName={customer.userId?.name}
             />
 
+            <div className="segmented-tabs" role="tablist" aria-label="Customer history tabs">
+              <button
+                type="button"
+                className={historyTab === 'schemes' ? 'active' : ''}
+                onClick={() => setHistoryTab('schemes')}
+              >
+                Schemes ({schemes.length})
+              </button>
+              <button
+                type="button"
+                className={historyTab === 'payments' ? 'active' : ''}
+                onClick={() => setHistoryTab('payments')}
+              >
+                Payments ({payments.length})
+              </button>
+              <button
+                type="button"
+                className={historyTab === 'payouts' ? 'active' : ''}
+                onClick={() => setHistoryTab('payouts')}
+              >
+                Settlements ({payouts.length})
+              </button>
+            </div>
+
+            {historyTab === 'schemes' && (
             <section className="reports-table-card">
               <div className="reports-table-head">
                 <h2>Scheme history</h2>
@@ -500,7 +524,9 @@ export function AdminCustomerDetailPage() {
                 </div>
               </QueryState>
             </section>
+            )}
 
+            {historyTab === 'payments' && (
             <section className="reports-table-card">
               <div className="reports-table-head">
                 <h2>Payments</h2>
@@ -544,7 +570,9 @@ export function AdminCustomerDetailPage() {
                 </div>
               </QueryState>
             </section>
+            )}
 
+            {historyTab === 'payouts' && (
             <section className="reports-table-card">
               <div className="reports-table-head">
                 <h2>Payout / redemption</h2>
@@ -580,6 +608,7 @@ export function AdminCustomerDetailPage() {
                 </div>
               </QueryState>
             </section>
+            )}
 
             <section className="phonepe-panel">
               <div className="phonepe-panel-head">
@@ -794,18 +823,6 @@ export function AdminCustomerDetailPage() {
                 value={enrollment.schemePlanId}
                 options={planOptions}
                 onChange={(value) => setEnrollment({ ...enrollment, schemePlanId: value })}
-              />
-            </label>
-            <label>
-              <span>Enrollment number</span>
-              <input
-                className="form-control"
-                required
-                placeholder="e.g. 1002"
-                value={enrollment.enrollmentNumber}
-                onChange={(event) =>
-                  setEnrollment({ ...enrollment, enrollmentNumber: event.target.value })
-                }
               />
             </label>
             <label className="full">

@@ -1,5 +1,62 @@
 export const isoDate = (value: Date) => value.toISOString().slice(0, 10);
 
+export type DateRangePreset =
+  | 'today'
+  | 'yesterday'
+  | 'last7'
+  | 'thisMonth'
+  | 'lastMonth'
+  | 'custom';
+
+export function todayRange(): [string, string] {
+  const today = isoDate(new Date());
+  return [today, today];
+}
+
+export function yesterdayRange(): [string, string] {
+  const day = new Date();
+  day.setDate(day.getDate() - 1);
+  const iso = isoDate(day);
+  return [iso, iso];
+}
+
+export function last7DaysRange(): [string, string] {
+  const to = new Date();
+  const from = new Date(to);
+  from.setDate(from.getDate() - 6);
+  return [isoDate(from), isoDate(to)];
+}
+
+export function lastMonthRange(): [string, string] {
+  const now = new Date();
+  const from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const to = new Date(now.getFullYear(), now.getMonth(), 0);
+  return [isoDate(from), isoDate(to)];
+}
+
+export function rangeForPreset(preset: Exclude<DateRangePreset, 'custom'>): [string, string] {
+  switch (preset) {
+    case 'today':
+      return todayRange();
+    case 'yesterday':
+      return yesterdayRange();
+    case 'last7':
+      return last7DaysRange();
+    case 'thisMonth':
+      return currentMonthRange();
+    case 'lastMonth':
+      return lastMonthRange();
+  }
+}
+
+export function detectPreset(from: string, to: string): DateRangePreset {
+  for (const preset of ['today', 'yesterday', 'last7', 'thisMonth', 'lastMonth'] as const) {
+    const [start, end] = rangeForPreset(preset);
+    if (start === from && end === to) return preset;
+  }
+  return 'custom';
+}
+
 export function currentMonthRange(): [string, string] {
   const now = new Date();
   const from = new Date(now.getFullYear(), now.getMonth(), 1);

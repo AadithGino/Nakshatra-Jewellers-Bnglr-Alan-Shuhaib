@@ -20,7 +20,7 @@ export const updateSchemePlanSchema = createSchemePlanSchema.partial().extend({
 export const createEnrollmentSchema = z.object({
   customerId: z.string().min(1),
   schemePlanId: z.string().min(1),
-  enrollmentNumber: z.string().trim().min(2).max(50),
+  enrollmentNumber: z.string().trim().min(2).max(50).optional(),
   startDate: z.coerce.date(),
 });
 

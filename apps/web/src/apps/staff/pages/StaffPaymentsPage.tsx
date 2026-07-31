@@ -1,24 +1,47 @@
-import { useState, type FormEvent } from 'react';
+import { useMemo, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import {
+  Banknote,
   CheckCircle2,
   ChevronRight,
+  CreditCard,
   FileEdit,
-  HandCoins,
+  Landmark,
+  QrCode,
+  ReceiptIndianRupee,
   ReceiptText,
+  Wallet,
   WalletCards,
 } from 'lucide-react';
 import { api, ApiError } from '../../../shared/services/api.client';
 import { date, goldGrams, money } from '../../../shared/utils/format';
 import { ReceiptSheet } from '../../../shared/components/ReceiptSheet';
+import { Select } from '../../../shared/components/Select';
 import { Modal, Notice, Page, QueryState, Status } from '../../../shared/components/ui';
+import { todayRange } from '../../../shared/utils/reportDateRange';
+import { StaffDateFilter } from '../components/StaffDateFilter';
 
 type Tab = 'payments' | 'submissions' | 'corrections';
+
+const METHOD_META = {
+  CASH: { label: 'Cash', icon: Banknote, tone: 'cash' },
+  UPI: { label: 'UPI', icon: QrCode, tone: 'upi' },
+  BANK: { label: 'Bank', icon: Landmark, tone: 'bank' },
+  CARD: { label: 'Card', icon: CreditCard, tone: 'card' },
+} as const;
+
+function inDateRange(iso: string | Date | undefined, from: string, to: string) {
+  if (!iso) return false;
+  const day = new Date(iso).toISOString().slice(0, 10);
+  return day >= from && day <= to;
+}
 
 export function StaffPaymentsPage() {
   const queryClient = useQueryClient();
   const [params, setParams] = useSearchParams();
+  const [from, setFrom] = useState(() => todayRange()[0]);
+  const [to, setTo] = useState(() => todayRange()[1]);
   const [tab, setTab] = useState<Tab>('payments');
   const [selected, setSelected] = useState<any>(null);
   const [correctionOpen, setCorrectionOpen] = useState(false);
@@ -27,18 +50,24 @@ export function StaffPaymentsPage() {
   const [requestedValue, setRequestedValue] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+
   const payments = useQuery({
-    queryKey: ['staff-payments'],
-    queryFn: () => api<any[]>('/staff/payments'),
+    queryKey: ['staff-payments', from, to],
+    queryFn: () => api<any[]>(`/staff/payments?from=${from}&to=${to}`),
   });
   const submissions = useQuery({
-    queryKey: ['staff-submissions'],
-    queryFn: () => api<any[]>('/staff/cash-submissions'),
+    queryKey: ['staff-submissions', from, to],
+    queryFn: () => api<any[]>(`/staff/cash-submissions?from=${from}&to=${to}`),
+  });
+  const report = useQuery({
+    queryKey: ['staff-collection-report', from, to],
+    queryFn: () => api<any>(`/staff/reports/collection?from=${from}&to=${to}`),
   });
   const corrections = useQuery({
     queryKey: ['staff-corrections'],
     queryFn: () => api<any[]>('/staff/corrections'),
   });
+
   const receiptId = params.get('receipt');
   const activePayment =
     selected ??
@@ -48,6 +77,7 @@ export function StaffPaymentsPage() {
     queryFn: () => api<any>(`/staff/payments/${activePayment!._id}/receipt`),
     enabled: Boolean(activePayment),
   });
+
   const correction = useMutation({
     mutationFn: () => {
       const requestedChanges: Record<string, unknown> = {};
@@ -77,6 +107,7 @@ export function StaffPaymentsPage() {
           : 'Unable to request correction.',
       ),
   });
+
   const closeReceipt = () => {
     setSelected(null);
     if (receiptId) {
@@ -84,193 +115,248 @@ export function StaffPaymentsPage() {
       setParams(params, { replace: true });
     }
   };
-  const todayTotal =
-    payments.data
-      ?.filter(
-        (item) =>
-          new Date(item.paymentDate).toDateString() === new Date().toDateString() &&
-          item.status === 'SUCCESS',
-      )
-      .reduce((sum, item) => sum + item.amountPaise, 0) ?? 0;
-  const openCorrections =
-    corrections.data?.filter((item) => item.status === 'PENDING').length ?? 0;
+
+  const byMethod = report.data?.byMethod ?? [];
+  const methodTotal = (method: string) =>
+    byMethod.find((row: any) => row.method === method)?.totalPaise ?? 0;
+  const methodCount = (method: string) =>
+    byMethod.find((row: any) => row.method === method)?.count ?? 0;
+
+  const filteredCorrections = useMemo(
+    () =>
+      (corrections.data ?? []).filter((item) =>
+        inDateRange(item.createdAt ?? item.updatedAt, from, to),
+      ),
+    [corrections.data, from, to],
+  );
+
+  const openCorrectionsInRange = filteredCorrections.filter(
+    (item) => item.status === 'PENDING',
+  ).length;
+
+  const totalCollected = report.data?.collectionPaise ?? 0;
+  const paymentCount = report.data?.paymentCount ?? payments.data?.length ?? 0;
+  const cashWithStaff = report.data?.cashWithStaffPaise ?? 0;
 
   return (
-    <Page
-      title="Payment activity"
-      subtitle="Receipts, cash submissions and correction requests."
-    >
+    <Page title="Payments" subtitle="Collections and submissions for the selected period.">
       <Notice>{message}</Notice>
 
-      <div className="staff-payment-summary">
-        <article>
-          <span>
-            <HandCoins />
-          </span>
-          <div>
-            <small>Collected today</small>
-            <strong>{money(todayTotal)}</strong>
-          </div>
-        </article>
-        <article>
-          <span>
-            <ReceiptText />
-          </span>
-          <div>
-            <small>Total receipts</small>
-            <strong>{payments.data?.length ?? 0}</strong>
-          </div>
-        </article>
-        <article>
-          <span>
-            <FileEdit />
-          </span>
-          <div>
-            <small>Open corrections</small>
-            <strong>{openCorrections}</strong>
-          </div>
-        </article>
-      </div>
+      <div className="staff-payments-page">
+        <StaffDateFilter from={from} to={to} onChange={(nextFrom, nextTo) => {
+          setFrom(nextFrom);
+          setTo(nextTo);
+        }} />
 
-      <div className="segmented-tabs" role="tablist">
-        <button
-          type="button"
-          className={tab === 'payments' ? 'active' : ''}
-          onClick={() => setTab('payments')}
-        >
-          <ReceiptText /> Payments
-        </button>
-        <button
-          type="button"
-          className={tab === 'submissions' ? 'active' : ''}
-          onClick={() => setTab('submissions')}
-        >
-          <WalletCards /> Cash status
-        </button>
-        <button
-          type="button"
-          className={tab === 'corrections' ? 'active' : ''}
-          onClick={() => setTab('corrections')}
-        >
-          <FileEdit /> Corrections
-        </button>
-      </div>
+        <section className="staff-payments-summary">
+          <div>
+            <span>
+              <ReceiptIndianRupee />
+            </span>
+            <small>Collected</small>
+            <b>{money(totalCollected)}</b>
+          </div>
+          <div>
+            <span>
+              <ReceiptText />
+            </span>
+            <small>Payments</small>
+            <b>{paymentCount}</b>
+          </div>
+          <div>
+            <span>
+              <Wallet />
+            </span>
+            <small>Cash with you</small>
+            <b>{money(cashWithStaff)}</b>
+          </div>
+        </section>
 
-      {tab === 'payments' && (
-        <QueryState
-          loading={payments.isLoading}
-          error={payments.error}
-          empty={!payments.isLoading && !payments.data?.length}
-          retry={() => void payments.refetch()}
-        >
-          <div className="passbook-ledger">
-            {payments.data?.map((payment) => (
-              <button
-                key={payment._id}
-                type="button"
-                className="passbook-entry"
-                onClick={() => setSelected(payment)}
-              >
-                <div className="passbook-entry-top">
-                  <span className="ledger-status" aria-hidden="true">
-                    <CheckCircle2 />
+        <section className="staff-method-list">
+          <div className="staff-method-list-head">
+            <h2>Payment type split</h2>
+            {openCorrectionsInRange > 0 ? (
+              <small>{openCorrectionsInRange} open correction{openCorrectionsInRange === 1 ? '' : 's'}</small>
+            ) : null}
+          </div>
+          <div className="staff-method-rows">
+            {(['CASH', 'UPI', 'BANK', 'CARD'] as const).map((method) => {
+              const meta = METHOD_META[method];
+              const Icon = meta.icon;
+              const total = methodTotal(method);
+              const count = methodCount(method);
+              return (
+                <div className={`staff-method-row ${meta.tone}`} key={method}>
+                  <span>
+                    <Icon />
                   </span>
-                  <div className="passbook-entry-copy">
-                    <b>{payment.receiptNumber ?? 'Pending receipt'}</b>
+                  <div>
+                    <b>{meta.label}</b>
                     <small>
-                      {date(payment.paymentDate)} · {payment.method}
+                      {count} payment{count === 1 ? '' : 's'}
                     </small>
                   </div>
-                  <div className="passbook-entry-value">
-                    <strong>{money(payment.amountPaise)}</strong>
-                    {payment.goldWeightMg ? (
-                      <small>{goldGrams(payment.goldWeightMg)}</small>
-                    ) : (
-                      <Status value={payment.status} />
-                    )}
-                  </div>
+                  <strong>{money(total)}</strong>
                 </div>
-                <div className="passbook-entry-footer">
-                  {payment.goldWeightMg ? (
-                    <em>{goldGrams(payment.goldWeightMg)} credited</em>
-                  ) : (
-                    <em className="cash">Cash contribution</em>
-                  )}
-                  <span>
-                    Receipt
-                    <ChevronRight />
-                  </span>
-                </div>
-              </button>
-            ))}
+              );
+            })}
           </div>
-        </QueryState>
-      )}
+        </section>
 
-      {tab === 'submissions' && (
-        <QueryState
-          loading={submissions.isLoading}
-          error={submissions.error}
-          empty={!submissions.isLoading && !submissions.data?.length}
-          retry={() => void submissions.refetch()}
-        >
-          <div className="passbook-ledger">
-            {submissions.data?.map((item) => (
-              <article className="passbook-entry" key={item._id}>
-                <div className="passbook-entry-top">
-                  <span className="transaction-icon">
-                    <WalletCards />
-                  </span>
-                  <div className="passbook-entry-copy">
-                    <b>{date(item.submissionDate)}</b>
-                    <small>{item.notes ?? 'Marked by administrator'}</small>
-                  </div>
-                  <div className="passbook-entry-value">
-                    <strong>{money(item.amountPaise)}</strong>
-                    <Status value={item.status} />
-                  </div>
-                </div>
-                <div className="passbook-entry-footer">
-                  <em className="cash">Cash submission</em>
-                  <span>Recorded</span>
-                </div>
-              </article>
-            ))}
-          </div>
-        </QueryState>
-      )}
+        <div className="segmented-tabs staff-payments-tabs" role="tablist">
+          <button
+            type="button"
+            className={tab === 'payments' ? 'active' : ''}
+            onClick={() => setTab('payments')}
+          >
+            <ReceiptText /> Payments
+          </button>
+          <button
+            type="button"
+            className={tab === 'submissions' ? 'active' : ''}
+            onClick={() => setTab('submissions')}
+          >
+            <WalletCards /> Submissions
+          </button>
+          <button
+            type="button"
+            className={tab === 'corrections' ? 'active' : ''}
+            onClick={() => setTab('corrections')}
+          >
+            <FileEdit /> Corrections
+          </button>
+        </div>
 
-      {tab === 'corrections' && (
-        <QueryState
-          loading={corrections.isLoading}
-          error={corrections.error}
-          empty={!corrections.isLoading && !corrections.data?.length}
-          retry={() => void corrections.refetch()}
-        >
-          <div className="passbook-ledger">
-            {corrections.data?.map((item) => (
-              <article className="passbook-entry" key={item._id}>
-                <div className="passbook-entry-top">
-                  <span className="transaction-icon">
-                    <FileEdit />
-                  </span>
-                  <div className="passbook-entry-copy">
-                    <b>{item.correctionType.replaceAll('_', ' ')}</b>
-                    <small>{item.reason}</small>
+        {tab === 'payments' && (
+          <QueryState
+            loading={payments.isLoading || report.isLoading}
+            error={payments.error ?? report.error}
+            empty={!payments.isLoading && !payments.data?.length}
+            retry={() => {
+              void payments.refetch();
+              void report.refetch();
+            }}
+          >
+            <div className="passbook-ledger">
+              {payments.data?.map((payment) => {
+                const customerName =
+                  payment.customerId?.userId?.name ??
+                  payment.customerId?.customerCode ??
+                  'Customer';
+                const customerCode = payment.customerId?.customerCode;
+                const enrollment = payment.schemeId?.enrollmentNumber;
+                return (
+                  <button
+                    key={payment._id}
+                    type="button"
+                    className="passbook-entry"
+                    onClick={() => setSelected(payment)}
+                  >
+                    <div className="passbook-entry-top">
+                      <span className="ledger-status" aria-hidden="true">
+                        <CheckCircle2 />
+                      </span>
+                      <div className="passbook-entry-copy">
+                        <b>{customerName}</b>
+                        <small>
+                          {date(payment.paymentDate)} ·{' '}
+                          {payment.method === 'PHONEPE' ? 'UPI' : payment.method}
+                          {customerCode ? ` · ${customerCode}` : ''}
+                        </small>
+                      </div>
+                      <div className="passbook-entry-value">
+                        <strong>{money(payment.amountPaise)}</strong>
+                        {payment.goldWeightMg ? (
+                          <small>{goldGrams(payment.goldWeightMg)}</small>
+                        ) : (
+                          <Status value={payment.status} />
+                        )}
+                      </div>
+                    </div>
+                    <div className="passbook-entry-footer">
+                      <em>
+                        {payment.receiptNumber ?? 'Pending receipt'}
+                        {enrollment ? ` · ${enrollment}` : ''}
+                      </em>
+                      <span>
+                        Receipt
+                        <ChevronRight />
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </QueryState>
+        )}
+
+        {tab === 'submissions' && (
+          <QueryState
+            loading={submissions.isLoading}
+            error={submissions.error}
+            empty={!submissions.isLoading && !submissions.data?.length}
+            retry={() => void submissions.refetch()}
+          >
+            <div className="passbook-ledger">
+              {submissions.data?.map((item) => (
+                <article className="passbook-entry" key={item._id}>
+                  <div className="passbook-entry-top">
+                    <span className="transaction-icon">
+                      <WalletCards />
+                    </span>
+                    <div className="passbook-entry-copy">
+                      <b>{date(item.submissionDate)}</b>
+                      <small>{item.notes ?? 'Marked by administrator'}</small>
+                    </div>
+                    <div className="passbook-entry-value">
+                      <strong>{money(item.amountPaise)}</strong>
+                      <Status value={item.status} />
+                    </div>
                   </div>
-                  <div className="passbook-entry-value">
-                    <Status value={item.status} />
+                  <div className="passbook-entry-footer">
+                    <em className="cash">Cash submission</em>
+                    <span>Recorded</span>
                   </div>
-                </div>
-                <div className="passbook-entry-footer">
-                  <em className="cash">Correction request</em>
-                  <span>Details</span>
-                </div>
-              </article>
-            ))}
-          </div>
-        </QueryState>
-      )}
+                </article>
+              ))}
+            </div>
+          </QueryState>
+        )}
+
+        {tab === 'corrections' && (
+          <QueryState
+            loading={corrections.isLoading}
+            error={corrections.error}
+            empty={!corrections.isLoading && !filteredCorrections.length}
+            retry={() => void corrections.refetch()}
+          >
+            <div className="passbook-ledger">
+              {filteredCorrections.map((item) => (
+                <article className="passbook-entry" key={item._id}>
+                  <div className="passbook-entry-top">
+                    <span className="transaction-icon">
+                      <FileEdit />
+                    </span>
+                    <div className="passbook-entry-copy">
+                      <b>{item.correctionType.replaceAll('_', ' ')}</b>
+                      <small>{item.reason}</small>
+                    </div>
+                    <div className="passbook-entry-value">
+                      <Status value={item.status} />
+                    </div>
+                  </div>
+                  <div className="passbook-entry-footer">
+                    <em className="cash">
+                      {item.createdAt ? date(item.createdAt) : 'Correction request'}
+                    </em>
+                    <span>Details</span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </QueryState>
+        )}
+      </div>
 
       <Modal title="Official payment receipt" open={Boolean(activePayment)} onClose={closeReceipt}>
         <QueryState
@@ -313,22 +399,18 @@ export function StaffPaymentsPage() {
         >
           <label>
             <span>Correction type</span>
-            <select
-              className="form-control"
+            <Select
               value={correctionType}
-              onChange={(event) => setCorrectionType(event.target.value)}
-            >
-              {[
+              options={[
                 'CHANGE_AMOUNT',
                 'CHANGE_METHOD',
                 'CHANGE_DATE',
                 'CHANGE_REFERENCE',
                 'CHANGE_NOTES',
                 'REVERSE_PAYMENT',
-              ].map((value) => (
-                <option key={value}>{value}</option>
-              ))}
-            </select>
+              ].map((value) => ({ value, label: value.replaceAll('_', ' ') }))}
+              onChange={setCorrectionType}
+            />
           </label>
           {correctionType !== 'REVERSE_PAYMENT' && (
             <label>

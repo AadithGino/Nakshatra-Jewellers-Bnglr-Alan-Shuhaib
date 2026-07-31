@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { api, ApiError } from '../../../shared/services/api.client';
 import { date, money } from '../../../shared/utils/format';
+import { Select } from '../../../shared/components/Select';
 import { Modal, Notice, Page, QueryState, Status } from '../../../shared/components/ui';
 
 const PAGE_SIZE = 10;
@@ -27,7 +28,9 @@ const customerId = (row: any) => {
 };
 const methodLabel = (method?: string) => {
   if (method === 'CASH') return 'Cash';
-  if (method === 'PHONEPE') return 'PhonePe';
+  if (method === 'PHONEPE' || method === 'UPI') return 'UPI';
+  if (method === 'BANK') return 'Bank';
+  if (method === 'CARD') return 'Card';
   return method ?? '—';
 };
 
@@ -313,35 +316,31 @@ export function PaymentsPage() {
           <div className="form-grid">
             <label>
               <span>Customer</span>
-              <select
-                className="form-control"
+              <Select
                 required
+                placeholder="Select customer"
                 value={form.customerId}
-                onChange={(event) => setForm({ ...form, customerId: event.target.value })}
-              >
-                <option value="">Select customer</option>
-                {(customers.data ?? []).map((customer: any) => (
-                  <option value={customer._id} key={customer._id}>
-                    {customer.customerCode} · {customer.userId?.name}
-                  </option>
-                ))}
-              </select>
+                options={(customers.data ?? []).map((customer: any) => ({
+                  value: customer._id,
+                  label: customer.userId?.name ?? customer.customerCode,
+                  hint: customer.customerCode,
+                }))}
+                onChange={(value) => setForm({ ...form, customerId: value })}
+              />
             </label>
             <label>
               <span>Enrollment</span>
-              <select
-                className="form-control"
+              <Select
                 required
+                placeholder="Select enrollment"
                 value={form.schemeId}
-                onChange={(event) => setForm({ ...form, schemeId: event.target.value })}
-              >
-                <option value="">Select enrollment</option>
-                {(enrollments.data ?? []).map((enrollment: any) => (
-                  <option value={enrollment._id} key={enrollment._id}>
-                    {enrollment.enrollmentNumber} · {enrollment.schemeType}
-                  </option>
-                ))}
-              </select>
+                options={(enrollments.data ?? []).map((enrollment: any) => ({
+                  value: enrollment._id,
+                  label: enrollment.enrollmentNumber,
+                  hint: enrollment.schemeType,
+                }))}
+                onChange={(value) => setForm({ ...form, schemeId: value })}
+              />
             </label>
             <label>
               <span>Amount ₹</span>
@@ -357,18 +356,15 @@ export function PaymentsPage() {
             </label>
             <label>
               <span>Method</span>
-              <select
-                className="form-control"
+              <Select
                 required
                 value={form.method}
-                onChange={(event) => setForm({ ...form, method: event.target.value })}
-              >
-                {['CASH', 'UPI', 'BANK', 'CARD'].map((method) => (
-                  <option key={method} value={method}>
-                    {method}
-                  </option>
-                ))}
-              </select>
+                options={['CASH', 'UPI', 'BANK', 'CARD'].map((method) => ({
+                  value: method,
+                  label: method,
+                }))}
+                onChange={(value) => setForm({ ...form, method: value })}
+              />
             </label>
             <label>
               <span>Payment date</span>

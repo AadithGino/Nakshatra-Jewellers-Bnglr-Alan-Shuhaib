@@ -7,6 +7,7 @@ import { StaffHomePage } from './pages/StaffHomePage';
 import { StaffPaymentsPage } from './pages/StaffPaymentsPage';
 import { StaffProfilePage } from './pages/StaffProfilePage';
 import { StaffCustomerDetailPage } from './pages/StaffCustomerDetailPage';
+import { StaffEnrollmentDetailPage } from './pages/StaffEnrollmentDetailPage';
 
 export const staffRoutes: RouteObject[] = [
   {
@@ -20,6 +21,7 @@ export const staffRoutes: RouteObject[] = [
       { index: true, element: <StaffHomePage /> },
       { path: 'customers', element: <StaffCustomersPage /> },
       { path: 'customers/:id', element: <StaffCustomerDetailPage /> },
+      { path: 'enrollments/:id', element: <StaffEnrollmentDetailPage /> },
       { path: 'collect', element: <StaffCollectPaymentPage /> },
       { path: 'payments', element: <StaffPaymentsPage /> },
       { path: 'profile', element: <StaffProfilePage /> },

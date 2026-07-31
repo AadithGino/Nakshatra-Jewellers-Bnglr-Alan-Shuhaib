@@ -1,8 +1,10 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  CalendarDays,
   ChevronLeft,
   ChevronRight,
+  Layers3,
   MapPin,
   Phone,
   Plus,
@@ -14,6 +16,7 @@ import {
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api, ApiError } from '../../../shared/services/api.client';
 import { AadhaarUploadFields } from '../../../shared/components/AadhaarUploadFields';
+import { Select } from '../../../shared/components/Select';
 import { Modal, Notice, Page, QueryState, Status } from '../../../shared/components/ui';
 
 const PAGE_SIZE = 10;
@@ -32,6 +35,9 @@ const emptyForm = {
   nomineePhone: '',
   aadhaarFrontKey: '',
   aadhaarBackKey: '',
+  enrollNow: false,
+  schemePlanId: '',
+  schemeStartDate: new Date().toISOString().slice(0, 10),
 };
 
 function Pagination({
@@ -75,12 +81,20 @@ export function CustomerManagementPage() {
   const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(params.get('action') === 'create');
   const [form, setForm] = useState(emptyForm);
+  const [showAddress, setShowAddress] = useState(false);
+  const [showNominee, setShowNominee] = useState(false);
+  const [showAadhaar, setShowAadhaar] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
   const list = useQuery({
     queryKey: ['admin-customers', search],
     queryFn: () => api<any[]>(`/admin/customers?search=${encodeURIComponent(search)}`),
+  });
+  const plans = useQuery({
+    queryKey: ['admin-scheme-plans-for-create'],
+    queryFn: () => api<any[]>('/admin/scheme-plans'),
+    enabled: createOpen,
   });
 
   const rows = list.data ?? [];
@@ -109,27 +123,37 @@ export function CustomerManagementPage() {
           name: form.name,
           phone: form.phone,
           password: form.password,
-          address: {
-            line1: form.line1 || undefined,
-            city: form.city || undefined,
-            district: form.district || undefined,
-            state: form.state || undefined,
-            postalCode: form.postalCode || undefined,
-          },
+          address:
+            showAddress || form.line1 || form.city || form.district || form.state || form.postalCode
+              ? {
+                  line1: form.line1 || undefined,
+                  city: form.city || undefined,
+                  district: form.district || undefined,
+                  state: form.state || undefined,
+                  postalCode: form.postalCode || undefined,
+                }
+              : undefined,
           aadhaar:
-            form.aadhaarFrontKey || form.aadhaarBackKey
+            (showAadhaar || form.aadhaarFrontKey || form.aadhaarBackKey)
               ? {
                   frontKey: form.aadhaarFrontKey || undefined,
                   backKey: form.aadhaarBackKey || undefined,
                 }
               : undefined,
-          nominee: form.nomineeName
+          nominee: showNominee && form.nomineeName
             ? {
                 name: form.nomineeName,
                 relationship: form.nomineeRelationship,
                 phone: form.nomineePhone || undefined,
               }
             : undefined,
+          enrollment:
+            form.enrollNow && form.schemePlanId
+              ? {
+                  schemePlanId: form.schemePlanId,
+                  startDate: form.schemeStartDate,
+                }
+              : undefined,
         }),
       }),
     onSuccess: async () => {
@@ -147,6 +171,9 @@ export function CustomerManagementPage() {
   const openCreate = () => {
     setError('');
     setForm(emptyForm);
+    setShowAddress(false);
+    setShowNominee(false);
+    setShowAadhaar(false);
     setCreateOpen(true);
   };
 
@@ -290,7 +317,7 @@ export function CustomerManagementPage() {
         >
           <p className="plan-modal-lead">
             Creates a login account with an auto-generated passbook ID, optional Aadhaar images, and
-            address / nominee details.
+            address / nominee details. You can optionally enroll into a scheme immediately.
           </p>
 
           <div className="plan-modal-preview">
@@ -344,81 +371,166 @@ export function CustomerManagementPage() {
               <input className="form-control" value="Auto-generated (000001…)" disabled readOnly />
             </label>
             <label className="full">
-              <span>Address line</span>
-              <input
-                className="form-control"
-                value={form.line1}
-                onChange={(event) => setForm({ ...form, line1: event.target.value })}
-              />
+              <span>Optional sections</span>
+              <div className="customer-page-actions">
+                <button
+                  type="button"
+                  className={showAddress ? 'primary' : 'secondary'}
+                  onClick={() => setShowAddress((value) => !value)}
+                >
+                  Address
+                </button>
+                <button
+                  type="button"
+                  className={showNominee ? 'primary' : 'secondary'}
+                  onClick={() => setShowNominee((value) => !value)}
+                >
+                  Nominee
+                </button>
+                <button
+                  type="button"
+                  className={showAadhaar ? 'primary' : 'secondary'}
+                  onClick={() => setShowAadhaar((value) => !value)}
+                >
+                  Aadhaar
+                </button>
+              </div>
             </label>
-            <label>
-              <span>City</span>
-              <input
-                className="form-control"
-                value={form.city}
-                onChange={(event) => setForm({ ...form, city: event.target.value })}
-              />
+            <label className="full">
+              <span>Enroll into scheme now</span>
+              <div className="enroll-modal-date">
+                <input
+                  type="checkbox"
+                  checked={form.enrollNow}
+                  onChange={(event) =>
+                    setForm({ ...form, enrollNow: event.target.checked, schemePlanId: '' })
+                  }
+                />
+                <small>Create first scheme enrollment with the selected plan</small>
+              </div>
             </label>
-            <label>
-              <span>District</span>
-              <input
-                className="form-control"
-                value={form.district}
-                onChange={(event) => setForm({ ...form, district: event.target.value })}
+            {form.enrollNow && (
+              <>
+                <label>
+                  <span>Scheme plan</span>
+                  <Select
+                    required
+                    icon={<Layers3 />}
+                    placeholder="Select active plan"
+                    value={form.schemePlanId}
+                    options={(plans.data ?? [])
+                      .filter((plan: any) => plan.status === 'ACTIVE')
+                      .map((plan: any) => ({
+                        value: plan._id,
+                        label: plan.name,
+                        hint: `${plan.type} · ${plan.durationMonths} months`,
+                      }))}
+                    onChange={(value) => setForm({ ...form, schemePlanId: value })}
+                  />
+                </label>
+                <label>
+                  <span>Scheme start date</span>
+                  <div className="enroll-modal-date">
+                    <CalendarDays />
+                    <input
+                      className="form-control"
+                      type="date"
+                      required
+                      value={form.schemeStartDate}
+                      onChange={(event) => setForm({ ...form, schemeStartDate: event.target.value })}
+                    />
+                  </div>
+                </label>
+              </>
+            )}
+            {showAddress && (
+              <>
+                <label className="full">
+                  <span>Address line</span>
+                  <input
+                    className="form-control"
+                    value={form.line1}
+                    onChange={(event) => setForm({ ...form, line1: event.target.value })}
+                  />
+                </label>
+                <label>
+                  <span>City</span>
+                  <input
+                    className="form-control"
+                    value={form.city}
+                    onChange={(event) => setForm({ ...form, city: event.target.value })}
+                  />
+                </label>
+                <label>
+                  <span>District</span>
+                  <input
+                    className="form-control"
+                    value={form.district}
+                    onChange={(event) => setForm({ ...form, district: event.target.value })}
+                  />
+                </label>
+                <label>
+                  <span>State</span>
+                  <input
+                    className="form-control"
+                    value={form.state}
+                    onChange={(event) => setForm({ ...form, state: event.target.value })}
+                  />
+                </label>
+                <label>
+                  <span>Postal code</span>
+                  <input
+                    className="form-control"
+                    value={form.postalCode}
+                    onChange={(event) => setForm({ ...form, postalCode: event.target.value })}
+                  />
+                </label>
+              </>
+            )}
+            {showAadhaar && (
+              <AadhaarUploadFields
+                frontKey={form.aadhaarFrontKey || undefined}
+                backKey={form.aadhaarBackKey || undefined}
+                disabled={create.isPending}
+                onChange={({ frontKey, backKey }) =>
+                  setForm({
+                    ...form,
+                    aadhaarFrontKey: frontKey ?? '',
+                    aadhaarBackKey: backKey ?? '',
+                  })
+                }
               />
-            </label>
-            <label>
-              <span>State</span>
-              <input
-                className="form-control"
-                value={form.state}
-                onChange={(event) => setForm({ ...form, state: event.target.value })}
-              />
-            </label>
-            <label>
-              <span>Postal code</span>
-              <input
-                className="form-control"
-                value={form.postalCode}
-                onChange={(event) => setForm({ ...form, postalCode: event.target.value })}
-              />
-            </label>
-            <AadhaarUploadFields
-              frontKey={form.aadhaarFrontKey || undefined}
-              backKey={form.aadhaarBackKey || undefined}
-              disabled={create.isPending}
-              onChange={({ frontKey, backKey }) =>
-                setForm({
-                  ...form,
-                  aadhaarFrontKey: frontKey ?? '',
-                  aadhaarBackKey: backKey ?? '',
-                })
-              }
-            />
-            <label>
-              <span>Nominee name</span>
-              <input
-                className="form-control"
-                value={form.nomineeName}
-                onChange={(event) => setForm({ ...form, nomineeName: event.target.value })}
-              />
-            </label>
-            <label>
-              <span>Nominee relationship</span>
-              <input
-                className="form-control"
-                value={form.nomineeRelationship}
-                onChange={(event) => setForm({ ...form, nomineeRelationship: event.target.value })}
-              />
-            </label>
-            <label>
-              <span>Nominee phone</span>
-              <input
-                className="form-control"
-                value={form.nomineePhone}
-                onChange={(event) => setForm({ ...form, nomineePhone: event.target.value })}
-              />
-            </label>
+            )}
+            {showNominee && (
+              <>
+                <label>
+                  <span>Nominee name</span>
+                  <input
+                    className="form-control"
+                    value={form.nomineeName}
+                    onChange={(event) => setForm({ ...form, nomineeName: event.target.value })}
+                  />
+                </label>
+                <label>
+                  <span>Nominee relationship</span>
+                  <input
+                    className="form-control"
+                    value={form.nomineeRelationship}
+                    onChange={(event) =>
+                      setForm({ ...form, nomineeRelationship: event.target.value })
+                    }
+                  />
+                </label>
+                <label>
+                  <span>Nominee phone</span>
+                  <input
+                    className="form-control"
+                    value={form.nomineePhone}
+                    onChange={(event) => setForm({ ...form, nomineePhone: event.target.value })}
+                  />
+                </label>
+              </>
+            )}
           </div>
 
           <Notice error>{error}</Notice>

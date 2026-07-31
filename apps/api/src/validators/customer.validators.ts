@@ -23,6 +23,12 @@ export const createCustomerSchema = z.object({
         .optional(),
     })
     .optional(),
+  enrollment: z
+    .object({
+      schemePlanId: z.string().min(1),
+      startDate: z.coerce.date(),
+    })
+    .optional(),
 });
 
 const addressSchema = z

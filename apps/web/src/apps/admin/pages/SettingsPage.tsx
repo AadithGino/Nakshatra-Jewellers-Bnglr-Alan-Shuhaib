@@ -277,7 +277,6 @@ function SettingsForm({ initial }: { initial: SettingsFormState }) {
                       <textarea
                         className="form-control"
                         rows={3}
-                        required={field.key === 'businessName'}
                         value={field.value}
                         onChange={(event) =>
                           setForm({ ...form, [field.key]: event.target.value })

@@ -251,6 +251,10 @@ export function AdminStaffDetailPage() {
       other: Math.round(((report?.otherCollectedPaise ?? 0) / total) * 100),
     };
   }, [report]);
+  const methodAmount = (method: string) =>
+    report?.byMethod?.find((row: any) => row.method === method)?.totalPaise ?? 0;
+  const methodCount = (method: string) =>
+    report?.byMethod?.find((row: any) => row.method === method)?.count ?? 0;
 
   return (
     <Page
@@ -387,6 +391,21 @@ export function AdminStaffDetailPage() {
                 </small>
               </div>
               <StaffDailyChart from={from} to={to} daily={report.daily ?? []} />
+            </section>
+
+            <section className="phonepe-panel">
+              <div className="phonepe-panel-head">
+                <h2>Payment type split</h2>
+              </div>
+              <div className="phonepe-facts-row">
+                {(['CASH', 'UPI', 'BANK', 'CARD'] as const).map((method) => (
+                  <div className="phonepe-fact" key={method}>
+                    <small>{method}</small>
+                    <b>{money(methodAmount(method))}</b>
+                    <em>{methodCount(method)} payments</em>
+                  </div>
+                ))}
+              </div>
             </section>
 
             <section className="reports-table-card">

@@ -15,6 +15,7 @@ import { api, ApiError } from '../../../shared/services/api.client';
 import { date, money } from '../../../shared/utils/format';
 import { dayChange, formatPercent } from '../../../shared/utils/goldRateChart';
 import { GoldRateTrendChart } from '../../../shared/components/GoldRateSparkline';
+import { Select } from '../../../shared/components/Select';
 import { Modal, Notice, Page, QueryState, Status } from '../../../shared/components/ui';
 
 function Fact({ label, value, hint }: { label: string; value: string; hint?: string }) {
@@ -350,17 +351,14 @@ export function GoldRateDetailPage() {
             </label>
             <label>
               <span>Status</span>
-              <select
-                className="form-control"
+              <Select
                 value={form.status}
-                onChange={(event) => setForm({ ...form, status: event.target.value })}
-              >
-                {['ACTIVE', 'INACTIVE'].map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
-              </select>
+                options={['ACTIVE', 'INACTIVE'].map((status) => ({
+                  value: status,
+                  label: status,
+                }))}
+                onChange={(value) => setForm({ ...form, status: value })}
+              />
             </label>
             <label className="full">
               <span>Notes</span>

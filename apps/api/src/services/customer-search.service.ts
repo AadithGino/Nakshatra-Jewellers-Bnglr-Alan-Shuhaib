@@ -31,8 +31,15 @@ export async function searchCustomers(search: string) {
 export async function getCustomerFinancialView(customerId: string) {
   const [customer, schemes, payments] = await Promise.all([
     Customer.findById(customerId).populate('userId', 'name phone').populate('nomineeId').lean(),
-    SchemeEnrollment.find({ customerId }).populate('schemePlanId', 'name type').lean(),
-    Payment.find({ customerId }).sort({ paymentDate: -1 }).limit(30).lean(),
+    SchemeEnrollment.find({ customerId })
+      .populate('schemePlanId', 'name type')
+      .sort({ startDate: -1, createdAt: -1 })
+      .lean(),
+    Payment.find({ customerId })
+      .populate('schemeId', 'enrollmentNumber schemeType')
+      .sort({ paymentDate: -1 })
+      .limit(250)
+      .lean(),
   ]);
   if (!customer) throw new AppError('CUSTOMER_NOT_FOUND', 'Customer not found', 404);
   const aadhaar = await signAadhaarUrls((customer as any).aadhaar);

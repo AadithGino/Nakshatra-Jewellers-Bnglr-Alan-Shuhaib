@@ -14,6 +14,14 @@ export type ReceiptPayment = {
   goldRatePerGramPaise?: number | null;
   goldWeightMg?: number | null;
   goldPurity?: string | null;
+  customerId?: {
+    customerCode?: string;
+    userId?: { name?: string; phone?: string } | null;
+  } | null;
+  schemeId?: {
+    enrollmentNumber?: string;
+    schemeType?: string;
+  } | null;
 };
 
 function safeDate(value?: string | Date | null) {
@@ -45,6 +53,9 @@ export function ReceiptSheet({
   const paymentDateLabel = safeDate(payment.paymentDate);
   const statusValue =
     typeof payment.status === 'string' && payment.status.trim() ? payment.status : null;
+  const customerName = payment.customerId?.userId?.name;
+  const customerCode = payment.customerId?.customerCode;
+  const enrollment = payment.schemeId?.enrollmentNumber;
 
   return (
     <div className="receipt-sheet">
@@ -64,6 +75,24 @@ export function ReceiptSheet({
       </div>
 
       <div className="receipt-lines">
+        {customerName && (
+          <div>
+            <span>Customer</span>
+            <b>{customerName}</b>
+          </div>
+        )}
+        {customerCode && (
+          <div>
+            <span>Passbook ID</span>
+            <b>{customerCode}</b>
+          </div>
+        )}
+        {enrollment && (
+          <div>
+            <span>Enrollment</span>
+            <b>{enrollment}</b>
+          </div>
+        )}
         {paymentDateLabel && (
           <div>
             <span>Date</span>

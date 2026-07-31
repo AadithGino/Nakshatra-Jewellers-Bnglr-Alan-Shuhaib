@@ -16,8 +16,36 @@ export const errorHandler: ErrorRequestHandler = (error, req, res, _next) => {
     );
   if (error instanceof mongoose.Error.CastError)
     appError = Errors.validation([{ path: error.path, message: 'Invalid identifier' }]);
-  if ((error as any)?.code === 11000)
-    appError = new AppError('DUPLICATE_RECORD', 'This record already exists', 409);
+  if ((error as any)?.code === 11000) {
+    const keyPattern = (error as any)?.keyPattern ?? {};
+    const keyValue = (error as any)?.keyValue ?? {};
+    const field = Object.keys(keyPattern)[0] ?? Object.keys(keyValue)[0] ?? '';
+    if (field === 'phone') {
+      appError = new AppError(
+        'DUPLICATE_PHONE',
+        'A customer with this phone number already exists',
+        409,
+        false,
+        [{ path: 'phone', message: 'This phone number is already registered' }],
+      );
+    } else if (field === 'customerCode') {
+      appError = new AppError(
+        'DUPLICATE_CUSTOMER_CODE',
+        'Passbook ID conflict. Please try again.',
+        409,
+        false,
+        [{ path: 'customerCode', message: 'Passbook ID already exists' }],
+      );
+    } else if (field === 'enrollmentNumber') {
+      appError = new AppError(
+        'DUPLICATE_ENROLLMENT',
+        'Enrollment number conflict. Please try again.',
+        409,
+      );
+    } else {
+      appError = new AppError('DUPLICATE_RECORD', 'This record already exists', 409);
+    }
+  }
   if (!(appError instanceof AppError))
     appError = new AppError('INTERNAL_ERROR', 'An unexpected error occurred', 500, true);
   logger[appError.statusCode >= 500 ? 'error' : 'warn'](

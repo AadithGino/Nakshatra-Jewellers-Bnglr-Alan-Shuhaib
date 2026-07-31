@@ -15,6 +15,13 @@ export const staffPaymentSchema = z.object({
   idempotencyKey: z.string().min(8).max(120),
 });
 
+export const staffPhonePeInitiateSchema = z.object({
+  customerId: z.string().min(1),
+  schemeId: z.string().min(1),
+  amountPaise: z.number().int().min(100),
+  idempotencyKey: z.string().min(8).max(120),
+});
+
 export const correctionRequestSchema = z.object({
   correctionType: z.enum([
     'CHANGE_AMOUNT',

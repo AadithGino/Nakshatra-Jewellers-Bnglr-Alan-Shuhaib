@@ -1,3 +1,4 @@
+import type { ClientSession } from "mongoose";
 import { AppError } from "../utils/AppError.js";
 import { withMongoTransaction } from "../utils/transaction.js";
 import {
@@ -5,6 +6,7 @@ import {
   GoldRate,
   Payment,
   Payout,
+  ReceiptCounter,
   SchemeEnrollment,
   SchemePlan,
 } from "../models/index.js";
@@ -17,6 +19,89 @@ import type {
   UpdateSchemePlanInput,
   UpdateGoldRateInput,
 } from "../validators/scheme.validators.js";
+
+const ENROLLMENT_SCOPE_PREFIX = "ENROLLMENT";
+
+export async function allocateEnrollmentNumber(
+  session: ClientSession,
+  startDate: Date,
+) {
+  const year = startDate.getFullYear();
+  const counter = await ReceiptCounter.findOneAndUpdate(
+    { scope: `${ENROLLMENT_SCOPE_PREFIX}-${year}` },
+    { $inc: { value: 1 } },
+    { upsert: true, new: true, session, setDefaultsOnInsert: true },
+  );
+  return `ENR-${year}-${String(counter.value).padStart(6, "0")}`;
+}
+
+export async function createEnrollmentRecord(
+  input: CreateEnrollmentInput,
+  context: AuditContext & { actorId: string },
+  session: ClientSession,
+) {
+  const [customer, plan] = await Promise.all([
+    Customer.findById(input.customerId).session(session),
+    SchemePlan.findOne({ _id: input.schemePlanId, status: "ACTIVE" }).session(session),
+  ]);
+  if (!customer || !plan) {
+    throw new AppError(
+      "ENROLLMENT_INPUT_INVALID",
+      "Customer or active plan not found",
+      404,
+    );
+  }
+  const existingActiveEnrollment = await SchemeEnrollment.exists({
+    customerId: customer._id,
+    status: "ACTIVE",
+  }).session(session);
+  if (existingActiveEnrollment) {
+    throw new AppError(
+      "CUSTOMER_ALREADY_ENROLLED",
+      "This customer already has an active scheme. Complete or settle it before enrolling again.",
+      409,
+    );
+  }
+
+  const enrollmentNumber =
+    input.enrollmentNumber?.trim() ||
+    (await allocateEnrollmentNumber(session, input.startDate));
+  const dates = enrollmentDates(
+    input.startDate,
+    plan.flexibleMonths,
+    plan.durationMonths,
+  );
+  const [enrollment] = await SchemeEnrollment.create(
+    [
+      {
+        customerId: input.customerId,
+        schemePlanId: input.schemePlanId,
+        enrollmentNumber,
+        startDate: input.startDate,
+        ...dates,
+        schemeType: plan.type,
+        durationMonths: plan.durationMonths,
+        flexibleMonths: plan.flexibleMonths,
+        statusHistory: [{ status: "ACTIVE", at: new Date(), actorId: context.actorId }],
+        createdBy: context.actorId,
+      },
+    ],
+    { session },
+  );
+  await audit(
+    session,
+    context,
+    "SCHEME_ENROLLED",
+    "SchemeEnrollment",
+    enrollment._id,
+    undefined,
+    enrollment.toObject(),
+  );
+  await outbox(session, "SCHEME_ENROLLED", "SchemeEnrollment", enrollment._id, {
+    customerId: customer._id,
+  });
+  return enrollment;
+}
 
 export const createSchemePlan = (
   input: CreateSchemePlanInput,
@@ -98,72 +183,10 @@ export async function createEnrollment(
   input: CreateEnrollmentInput,
   context: AuditContext & { actorId: string },
 ) {
-  return withMongoTransaction(async (session) => {
-    const [customer, plan] = await Promise.all([
-      Customer.findById(input.customerId).session(session),
-      SchemePlan.findOne({ _id: input.schemePlanId, status: "ACTIVE" }).session(
-        session,
-      ),
-    ]);
-    if (!customer || !plan) {
-      throw new AppError(
-        "ENROLLMENT_INPUT_INVALID",
-        "Customer or active plan not found",
-        404,
-      );
-    }
-    const existingActiveEnrollment = await SchemeEnrollment.exists({
-      customerId: customer._id,
-      status: "ACTIVE",
-    }).session(session);
-    if (existingActiveEnrollment) {
-      throw new AppError(
-        "CUSTOMER_ALREADY_ENROLLED",
-        "This customer already has an active scheme. Complete or settle it before enrolling again.",
-        409,
-      );
-    }
-    const dates = enrollmentDates(
-      input.startDate,
-      plan.flexibleMonths,
-      plan.durationMonths,
-    );
-    const [enrollment] = await SchemeEnrollment.create(
-      [
-        {
-          ...input,
-          ...dates,
-          schemeType: plan.type,
-          durationMonths: plan.durationMonths,
-          flexibleMonths: plan.flexibleMonths,
-          statusHistory: [
-            { status: "ACTIVE", at: new Date(), actorId: context.actorId },
-          ],
-          createdBy: context.actorId,
-        },
-      ],
-      { session },
-    );
-    await audit(
-      session,
-      context,
-      "SCHEME_ENROLLED",
-      "SchemeEnrollment",
-      enrollment._id,
-      undefined,
-      enrollment.toObject(),
-    );
-    await outbox(
-      session,
-      "SCHEME_ENROLLED",
-      "SchemeEnrollment",
-      enrollment._id,
-      {
-        customerId: customer._id,
-      },
-    );
-    return enrollment;
-  }, context.requestId);
+  return withMongoTransaction(
+    (session) => createEnrollmentRecord(input, context, session),
+    context.requestId,
+  );
 }
 
 export async function listEnrollments(page: number, limit: number) {

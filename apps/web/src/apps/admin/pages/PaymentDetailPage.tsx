@@ -30,7 +30,9 @@ const resolveId = (value: unknown) => {
 
 const methodLabel = (method?: string) => {
   if (method === 'CASH') return 'Cash';
-  if (method === 'PHONEPE') return 'PhonePe';
+  if (method === 'PHONEPE' || method === 'UPI') return 'UPI';
+  if (method === 'BANK') return 'Bank';
+  if (method === 'CARD') return 'Card';
   return method ?? '—';
 };
 

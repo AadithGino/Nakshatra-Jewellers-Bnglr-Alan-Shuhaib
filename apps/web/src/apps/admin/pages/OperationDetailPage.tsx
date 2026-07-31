@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Database, Edit3, Fingerprint, ShieldCheck } from 'lucide-react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { api, ApiError } from '../../../shared/services/api.client';
+import { Select } from '../../../shared/components/Select';
 import { Card, Modal, Notice, Page, QueryState } from '../../../shared/components/ui';
 import { displayOperationValue, getOperationValue, operationConfigs } from './OperationsPage';
 
@@ -214,17 +215,16 @@ export function OperationDetailPage({ module }: { module: string }) {
               >
                 <span>{field.label}</span>
                 {field.options ? (
-                  <select
-                    className="form-control"
+                  <Select
                     required
+                    placeholder="Select"
                     value={values[field.key] ?? ''}
-                    onChange={(event) => setValues({ ...values, [field.key]: event.target.value })}
-                  >
-                    <option value="">Select</option>
-                    {field.options.map((option) => (
-                      <option key={option}>{option}</option>
-                    ))}
-                  </select>
+                    options={field.options.map((option) => ({
+                      value: option,
+                      label: option,
+                    }))}
+                    onChange={(value) => setValues({ ...values, [field.key]: value })}
+                  />
                 ) : (
                   <input
                     className="form-control"

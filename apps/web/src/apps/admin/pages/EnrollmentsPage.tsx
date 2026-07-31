@@ -92,7 +92,6 @@ export function EnrollmentsPage() {
   const [form, setForm] = useState({
     customerId: '',
     schemePlanId: '',
-    enrollmentNumber: '',
     startDate: new Date().toISOString().slice(0, 10),
   });
 
@@ -158,7 +157,6 @@ export function EnrollmentsPage() {
       setForm({
         customerId: '',
         schemePlanId: '',
-        enrollmentNumber: '',
         startDate: new Date().toISOString().slice(0, 10),
       });
       await queryClient.invalidateQueries({ queryKey: ['admin-enrollments'] });
@@ -191,7 +189,6 @@ export function EnrollmentsPage() {
     setForm({
       customerId: '',
       schemePlanId: '',
-      enrollmentNumber: '',
       startDate: new Date().toISOString().slice(0, 10),
     });
     setCreateOpen(true);
@@ -397,17 +394,7 @@ export function EnrollmentsPage() {
                 onChange={(value) => setForm({ ...form, schemePlanId: value })}
               />
             </label>
-            <label>
-              <span>Enrollment number</span>
-              <input
-                className="form-control"
-                required
-                placeholder="e.g. 1002"
-                value={form.enrollmentNumber}
-                onChange={(event) => setForm({ ...form, enrollmentNumber: event.target.value })}
-              />
-            </label>
-            <label>
+            <label className="full">
               <span>Start date</span>
               <div className="enroll-modal-date">
                 <CalendarDays />

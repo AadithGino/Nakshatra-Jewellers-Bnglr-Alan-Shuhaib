@@ -6,12 +6,14 @@ import {
   CalendarClock,
   ChevronLeft,
   ChevronRight,
+  CreditCard,
   Download,
   Gem,
-  Globe,
   HandCoins,
   IndianRupee,
+  Landmark,
   Layers3,
+  QrCode,
   ReceiptText,
   Search,
   Users,
@@ -60,10 +62,17 @@ const REPORT_OPTIONS: Record<ReportTab, { value: string; label: string }[]> = {
   maturity: [{ value: 'maturity', label: 'Maturity Calendar' }],
 };
 
-const ONLINE_METHODS = new Set(['PHONEPE', 'UPI', 'BANK', 'CARD']);
 const PAGE_SIZE = 10;
+const METHOD_ORDER = ['CASH', 'UPI', 'BANK', 'CARD'] as const;
 
-const methodLabel = (method?: string) => (method === 'CASH' ? 'Cash' : 'Online');
+const methodLabel = (method?: string) => {
+  const normalized = method === 'PHONEPE' ? 'UPI' : method;
+  if (normalized === 'CASH') return 'Cash';
+  if (normalized === 'UPI') return 'UPI';
+  if (normalized === 'BANK') return 'Bank';
+  if (normalized === 'CARD') return 'Card';
+  return normalized ?? '—';
+};
 const schemeTypeLabel = (value?: string) =>
   value === 'GOLD_WEIGHT' ? 'Gold weight' : value === 'CASH' ? 'Cash' : value ?? '—';
 
@@ -403,18 +412,29 @@ export function ReportsPage({ initial = 'collections' }: { initial?: string }) {
   const collectionSummary = useMemo(() => {
     if (tab !== 'collections' || !query.data?.summary) return null;
     const summaryRows = query.data.summary as { _id: string; totalPaise: number; count: number }[];
-    const cash = summaryRows.find((row) => row._id === 'CASH');
-    const online = summaryRows
-      .filter((row) => ONLINE_METHODS.has(row._id))
-      .reduce(
-        (acc, row) => ({ totalPaise: acc.totalPaise + row.totalPaise, count: acc.count + row.count }),
-        { totalPaise: 0, count: 0 },
-      );
+    const byMethod = new Map<string, { totalPaise: number; count: number }>();
+    for (const row of summaryRows) {
+      const method = row._id === 'PHONEPE' ? 'UPI' : row._id;
+      const current = byMethod.get(method) ?? { totalPaise: 0, count: 0 };
+      byMethod.set(method, {
+        totalPaise: current.totalPaise + (row.totalPaise ?? 0),
+        count: current.count + (row.count ?? 0),
+      });
+    }
+    const methodTotals = Object.fromEntries(
+      METHOD_ORDER.map((method) => [
+        method,
+        byMethod.get(method) ?? { totalPaise: 0, count: 0 },
+      ]),
+    ) as Record<(typeof METHOD_ORDER)[number], { totalPaise: number; count: number }>;
     return {
       totalPaise: summaryRows.reduce((sum, row) => sum + row.totalPaise, 0),
-      cashPaise: cash?.totalPaise ?? 0,
-      onlinePaise: online.totalPaise,
       paymentCount: summaryRows.reduce((sum, row) => sum + row.count, 0),
+      cashPaise: methodTotals.CASH.totalPaise,
+      upiPaise: methodTotals.UPI.totalPaise,
+      bankPaise: methodTotals.BANK.totalPaise,
+      cardPaise: methodTotals.CARD.totalPaise,
+      byMethod: methodTotals,
     };
   }, [query.data, tab]);
 
@@ -688,7 +708,7 @@ export function ReportsPage({ initial = 'collections' }: { initial?: string }) {
         <QueryState loading={query.isLoading} error={query.error} retry={() => void query.refetch()}>
           {tab === 'collections' && (
             <>
-              <div className="reports-kpi-grid">
+              <div className="reports-kpi-grid reports-kpi-grid-methods">
                 <article className="dashboard-kpi">
                   <span>
                     <IndianRupee />
@@ -709,11 +729,29 @@ export function ReportsPage({ initial = 'collections' }: { initial?: string }) {
                 </article>
                 <article className="dashboard-kpi">
                   <span>
-                    <Globe />
+                    <QrCode />
                   </span>
                   <div>
-                    <small>Online</small>
-                    <strong>{money(collectionSummary?.onlinePaise)}</strong>
+                    <small>UPI</small>
+                    <strong>{money(collectionSummary?.upiPaise)}</strong>
+                  </div>
+                </article>
+                <article className="dashboard-kpi">
+                  <span>
+                    <Landmark />
+                  </span>
+                  <div>
+                    <small>Bank</small>
+                    <strong>{money(collectionSummary?.bankPaise)}</strong>
+                  </div>
+                </article>
+                <article className="dashboard-kpi">
+                  <span>
+                    <CreditCard />
+                  </span>
+                  <div>
+                    <small>Card</small>
+                    <strong>{money(collectionSummary?.cardPaise)}</strong>
                   </div>
                 </article>
                 <article className="dashboard-kpi success">
@@ -867,6 +905,9 @@ export function ReportsPage({ initial = 'collections' }: { initial?: string }) {
                         <th>Phone</th>
                         <th>Status</th>
                         <th>Payments</th>
+                        <th>UPI</th>
+                        <th>Bank</th>
+                        <th>Card</th>
                         <th>Total collection</th>
                         <th>Cash collected</th>
                         <th>Cash submitted</th>
@@ -894,6 +935,24 @@ export function ReportsPage({ initial = 'collections' }: { initial?: string }) {
                             <Status value={row.userId?.status ?? 'ACTIVE'} />
                           </td>
                           <td>{row.paymentCount ?? 0}</td>
+                          <td>
+                            {money(
+                              row.byMethod?.find((method: any) => method.method === 'UPI')
+                                ?.totalPaise ?? 0,
+                            )}
+                          </td>
+                          <td>
+                            {money(
+                              row.byMethod?.find((method: any) => method.method === 'BANK')
+                                ?.totalPaise ?? 0,
+                            )}
+                          </td>
+                          <td>
+                            {money(
+                              row.byMethod?.find((method: any) => method.method === 'CARD')
+                                ?.totalPaise ?? 0,
+                            )}
+                          </td>
                           <td>{money(row.totalPaise)}</td>
                           <td>{money(row.cashCollectedPaise)}</td>
                           <td>{money(row.cashSubmittedPaise)}</td>

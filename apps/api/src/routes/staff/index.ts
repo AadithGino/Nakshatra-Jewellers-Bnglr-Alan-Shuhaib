@@ -4,6 +4,7 @@ import { authenticate, authorize, requirePermission } from '../../middlewares/au
 import { validateBody } from '../../middlewares/validate.middleware.js';
 import {
   correctionRequestSchema,
+  staffPhonePeInitiateSchema,
   staffPaymentSchema,
 } from '../../validators/staff-portal.validators.js';
 import { createCustomerSchema } from '../../validators/customer.validators.js';
@@ -12,14 +13,18 @@ import {
   collectPaymentHandler,
   createCustomerHandler,
   createEnrollmentHandler,
+  getEnrollmentHandler,
+  getPhonePeCollectionIntentHandler,
   getCustomerHandler,
   getStaffDashboard,
   getStaffProfileHandler,
   getOwnReceiptHandler,
+  getOwnCollectionReportHandler,
   listSchemePlansHandler,
   listOwnCashSubmissionsHandler,
   listOwnCorrectionsHandler,
   listOwnPaymentsHandler,
+  initiatePhonePeCollectionHandler,
   previewPaymentHandler,
   requestCorrectionHandler,
   searchCustomersHandler,
@@ -29,6 +34,7 @@ const staffRouter = Router();
 
 staffRouter.use(authenticate, authorize('STAFF'));
 staffRouter.get('/dashboard', asyncHandler(getStaffDashboard));
+staffRouter.get('/reports/collection', asyncHandler(getOwnCollectionReportHandler));
 staffRouter.get(
   '/customers',
   requirePermission('canViewCustomers'),
@@ -46,6 +52,11 @@ staffRouter.get(
   asyncHandler(getCustomerHandler),
 );
 staffRouter.get('/scheme-plans', asyncHandler(listSchemePlansHandler));
+staffRouter.get(
+  '/enrollments/:id',
+  requirePermission('canViewCustomers'),
+  asyncHandler(getEnrollmentHandler),
+);
 staffRouter.post(
   '/enrollments',
   requirePermission('canEnrollScheme'),
@@ -56,6 +67,17 @@ staffRouter.get(
   '/schemes/:id/payment-preview',
   requirePermission('canCollectPayment'),
   asyncHandler(previewPaymentHandler),
+);
+staffRouter.post(
+  '/payments/phonepe',
+  requirePermission('canCollectPayment'),
+  validateBody(staffPhonePeInitiateSchema),
+  asyncHandler(initiatePhonePeCollectionHandler),
+);
+staffRouter.get(
+  '/payment-intents/:orderId',
+  requirePermission('canCollectPayment'),
+  asyncHandler(getPhonePeCollectionIntentHandler),
 );
 staffRouter.post(
   '/payments',

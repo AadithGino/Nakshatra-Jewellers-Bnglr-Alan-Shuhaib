@@ -214,7 +214,10 @@ export async function getStaffReceipt(staffId: string, paymentId: string) {
     _id: paymentId,
     collectedBy: staffId,
     status: mongoose.trusted({ $in: ['SUCCESS', 'REVERSED'] }),
-  }).lean();
+  })
+    .populate({ path: 'customerId', populate: { path: 'userId', select: 'name phone' } })
+    .populate('schemeId', 'enrollmentNumber schemeType')
+    .lean();
   if (!payment) throw new AppError('RECEIPT_NOT_FOUND', 'Receipt not found', 404);
   return { receiptNumber: payment.receiptNumber, payment };
 }

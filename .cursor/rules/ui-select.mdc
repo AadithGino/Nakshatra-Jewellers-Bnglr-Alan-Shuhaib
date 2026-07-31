@@ -1,0 +1,40 @@
+---
+description: Use shared custom Select instead of native HTML select
+globs: apps/web/**/*.{tsx,ts,css}
+alwaysApply: false
+---
+
+# Custom Select (required)
+
+Never use native `<select>` in `apps/web`. Use the shared component:
+
+```tsx
+import { Select } from '../../../shared/components/Select';
+
+<Select
+  value={value}
+  options={[{ value: 'a', label: 'Label', hint: 'Optional subtitle' }]}
+  onChange={setValue}
+  placeholder="Select…"
+  icon={<SomeIcon />} // optional
+  required
+/>
+```
+
+## Rules
+
+- Import from `apps/web/src/shared/components/Select.tsx` (admin may keep `AdminSelect` re-export).
+- Style via `.ui-select*` in `design-v2.css` — do not invent per-page dropdown CSS.
+- Prefer `label` + optional `hint` over cramming everything into one string.
+- Because `Select` is not a native control, validate empty required values in submit handlers (`if (!value) setError(...)`).
+- Specialized pickers (date range, reports chrome) may keep their own components, but general option lists must use `Select`.
+
+```tsx
+// ❌ BAD
+<select className="form-control" value={id} onChange={...}>
+  <option value="">Select plan</option>
+</select>
+
+// ✅ GOOD
+<Select value={id} options={planOptions} onChange={setId} placeholder="Select plan" />
+```
